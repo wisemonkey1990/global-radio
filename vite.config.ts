@@ -3,8 +3,12 @@ import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 import { resolve } from 'path'
 
+// 部署在子路径（如 GitHub Pages 的 /global-radio/）时用 VITE_BASE 指定，默认为根路径
+const base = (process.env.VITE_BASE || '/').replace(/\/?$/, '/')
+
 // https://vitejs.dev/config/
 export default defineConfig({
+  base,
   plugins: [
     vue({
       template: {
@@ -21,7 +25,8 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp,woff2}'],
         maximumFileSizeToCacheInBytes: 3000000, // 3MB
         // /classic/ 是原来的全球电台 SPA（有自己的 index.html），不能回退到首页的 index.html
-        navigateFallbackDenylist: [/^\/classic\//],
+        navigateFallback: `${base}index.html`,
+        navigateFallbackDenylist: [new RegExp(`^${base}classic/`)],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.radio-browser\.info\/.*/i,
@@ -44,8 +49,8 @@ export default defineConfig({
         background_color: '#1a1a1a',
         display: 'standalone',
         orientation: 'portrait',
-        scope: '/',
-        start_url: '/',
+        scope: base,
+        start_url: base,
         icons: [
           {
             src: 'icon-192x192.png',
@@ -70,14 +75,14 @@ export default defineConfig({
             name: '随机播放',
             short_name: '随机',
             description: '经典版：播放随机电台',
-            url: '/classic/?random=true',
+            url: `${base}classic/?random=true`,
             icons: [{ src: 'icon-192x192.png', sizes: '192x192' }]
           },
           {
             name: '我的收藏',
             short_name: '收藏',
             description: '经典版：查看收藏的电台',
-            url: '/classic/favorites',
+            url: `${base}classic/favorites`,
             icons: [{ src: 'icon-192x192.png', sizes: '192x192' }]
           }
         ]

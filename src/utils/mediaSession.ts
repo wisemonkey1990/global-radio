@@ -39,7 +39,7 @@ export class MediaSessionManager {
     if ('mediaSession' in navigator) {
       try {
         // 准备艺术作品数组
-        const defaultArtwork = '/favicon.svg'
+        const defaultArtwork = `${import.meta.env.BASE_URL}favicon.svg`
         const artworkSrc = station.favicon || defaultArtwork
         
         // 确保artwork URL是完整的
