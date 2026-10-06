@@ -20,6 +20,8 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp,woff2}'],
         maximumFileSizeToCacheInBytes: 3000000, // 3MB
+        // /classic/ 是原来的全球电台 SPA（有自己的 index.html），不能回退到首页的 index.html
+        navigateFallbackDenylist: [/^\/classic\//],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.radio-browser\.info\/.*/i,
@@ -35,11 +37,11 @@ export default defineConfig({
         ],
       },
       manifest: {
-        name: '全球电台 - GlobalRadio',
-        short_name: '全球电台',
-        description: '聆听全球高品质电台，享受无限音乐、新闻和娱乐内容',
-        theme_color: '#1a365d',
-        background_color: '#0f172a',
+        name: 'AI 电台 - GlobalRadio',
+        short_name: 'AI 电台',
+        description: 'AI 电台：七个快捷调频、三位 DJ，音质旋钮可调成老式中波 / 电子管收音机',
+        theme_color: '#1b1b1b',
+        background_color: '#1a1a1a',
         display: 'standalone',
         orientation: 'portrait',
         scope: '/',
@@ -67,15 +69,15 @@ export default defineConfig({
           {
             name: '随机播放',
             short_name: '随机',
-            description: '播放随机电台',
-            url: '/?random=true',
+            description: '经典版：播放随机电台',
+            url: '/classic/?random=true',
             icons: [{ src: 'icon-192x192.png', sizes: '192x192' }]
           },
           {
             name: '我的收藏',
             short_name: '收藏',
-            description: '查看收藏的电台',
-            url: '/favorites',
+            description: '经典版：查看收藏的电台',
+            url: '/classic/favorites',
             icons: [{ src: 'icon-192x192.png', sizes: '192x192' }]
           }
         ]
@@ -97,6 +99,12 @@ export default defineConfig({
     outDir: 'dist',
     assetsDir: 'assets',
     sourcemap: false,
-    minify: 'terser'
+    minify: 'terser',
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        classic: resolve(__dirname, 'classic/index.html')
+      }
+    }
   }
 })
