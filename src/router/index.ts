@@ -5,7 +5,7 @@ import Favorites from '@/views/Favorites.vue'
 import History from '@/views/History.vue'
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory('/classic/'),
   routes: [
     {
       path: '/',

@@ -67,7 +67,8 @@ const pctText = (v: number) => (v === 0 ? '关' : `${Math.round(v * 100)}%`)
       </div>
 
       <p class="credit">
-        网络信号源：<a href="https://somafm.com" target="_blank" rel="noopener">SomaFM</a>（听众支持的独立电台）。收不到时自动切换到内置乐队。
+        网络信号源：<a href="https://somafm.com" target="_blank" rel="noopener">SomaFM</a>（听众支持的独立电台）。收不到时自动切换到内置乐队。<br />
+        <a href="/classic/">打开经典版全球电台（搜索 / 收藏 / 历史）</a>
       </p>
     </section>
   </div>
