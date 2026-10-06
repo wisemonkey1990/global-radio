@@ -20,6 +20,8 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp,woff2}'],
         maximumFileSizeToCacheInBytes: 3000000, // 3MB
+        // /ai-radio/ 是独立的第二个页面，不能被回退到主应用的 index.html
+        navigateFallbackDenylist: [/^\/ai-radio\//],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.radio-browser\.info\/.*/i,
@@ -97,6 +99,12 @@ export default defineConfig({
     outDir: 'dist',
     assetsDir: 'assets',
     sourcemap: false,
-    minify: 'terser'
+    minify: 'terser',
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        aiRadio: resolve(__dirname, 'ai-radio/index.html')
+      }
+    }
   }
 })
