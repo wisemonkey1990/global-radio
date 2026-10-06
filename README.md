@@ -39,6 +39,13 @@
 - DJ 语音：默认用浏览器语音合成。**浏览器无法把它接入 Web Audio，所以这种语音不会被收音机滤波**；
   在设置里填入兼容 OpenAI 的 `/audio/speech` 接口后，DJ 的声音就会和音乐一起经过收音机。
 
+## GitHub Pages 部署
+
+仓库自带工作流 `.github/workflows/pages.yml`：推送到 `main`（或在 Actions 页手动运行）即构建并发布到 GitHub Pages。
+首次使用：仓库 **Settings → Pages → Build and deployment → Source** 选 **GitHub Actions**。
+发布地址是 `https://<用户名>.github.io/global-radio/`；构建时通过 `VITE_BASE` 自动带上子路径，绑定自定义域名时则为根路径。
+本地模拟：`VITE_BASE=/global-radio/ npm run build`。
+
 ## 目录结构
 
 ```text
