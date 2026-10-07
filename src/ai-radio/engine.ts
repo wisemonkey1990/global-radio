@@ -441,7 +441,7 @@ export async function tune(id: PresetId) {
   localQueue = []
   localIndex = 0
   if (!state.playing) return play()
-  if (!changed && state.source !== 'local') return nextStation()
+  if (!changed && state.source !== 'local') return pause() // tapping the playing channel again stops it
   state.tuning = true
   clearTimeout(djTimer)
   cancelBrowserSpeech()

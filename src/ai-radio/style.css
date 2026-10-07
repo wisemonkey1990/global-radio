@@ -256,36 +256,6 @@ input:focus-visible {
   animation: pulse 1s ease-in-out infinite;
 }
 
-.power {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  width: calc(100% - 48px);
-  height: 48px;
-  margin: 14px 24px 0;
-  border-radius: 24px;
-  background: linear-gradient(160deg, #2d2d2d, #232323);
-  box-shadow: 5px 7px 14px rgba(0, 0, 0, 0.45), -3px -3px 8px rgba(255, 255, 255, 0.022), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  font-size: 15px;
-  letter-spacing: 0.12em;
-  color: #cfcfcf;
-  transition: box-shadow 0.15s, color 0.15s;
-}
-
-.power svg {
-  color: #8d8d8d;
-}
-
-.power.on svg {
-  color: var(--accent);
-  filter: drop-shadow(0 0 5px rgba(255, 90, 51, 0.6));
-}
-
-.power:active {
-  box-shadow: inset 3px 4px 8px rgba(0, 0, 0, 0.5), inset -2px -2px 5px rgba(255, 255, 255, 0.03);
-}
-
 /* ---------------------------------------------------------------- panel */
 .panel {
   margin: 14px 14px 0;
