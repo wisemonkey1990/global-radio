@@ -7,7 +7,7 @@ import { startGenerative, type Generative } from './audio/generative'
 import { HOSTS, PRESETS, SLEEP_STEPS, type HostId, type Lang, type PresetId } from './data'
 import { cueLine, djLine } from './dj'
 import { curatedFor, lastStation, loadDirectory, probeStream, rememberStation, type Station } from './stations'
-import { cancelBrowserSpeech, emptyTts, fetchSpeech, speakWithBrowser, ttsReady, type TtsConfig } from './voice'
+import { cancelBrowserSpeech, emptyTts, fetchSpeech, speakWithBrowser, ttsReady, unlockSpeech, type TtsConfig } from './voice'
 
 const STORE_KEY = 'ai-radio:v1'
 const STREAM_TIMEOUT_MS = 9000
@@ -60,6 +60,8 @@ export const state = reactive({
   sleepMin: 0,
   sleepLeft: 0,
   djSpeaking: false,
+  /** short-lived message that takes over the status line */
+  alert: '',
   cueHost: '' as HostId | '',
 })
 
@@ -127,6 +129,13 @@ function ensureAudio() {
   })
   document.addEventListener('visibilitychange', onVisibility)
   return ctx
+}
+
+let alertTimer = 0
+function flash(message: string) {
+  state.alert = message
+  clearTimeout(alertTimer)
+  alertTimer = window.setTimeout(() => (state.alert = ''), 9000)
 }
 
 const preset = () => PRESETS.find((p) => p.id === state.preset) ?? PRESETS[0]
@@ -326,6 +335,7 @@ function scheduleDj(seconds: number) {
   clearTimeout(djTimer)
   djTimer = window.setTimeout(async () => {
     if (!state.playing) return
+    if (state.tuning) return scheduleDj(3) // let the station come in first
     await speak(djLine(state.lang, preset(), host()), host())
     scheduleDj(240 + Math.random() * 120)
   }, seconds * 1000)
@@ -367,7 +377,9 @@ async function speak(text: string, h = host()) {
         state.note = '外部语音接口出错，改用浏览器语音（这种语音不会经过收音机滤波）'
       }
     }
-    await speakWithBrowser(text, state.lang, h)
+    if (!(await speakWithBrowser(text, state.lang, h))) {
+      flash('DJ 语音不可用：这个浏览器/设备没有能用的语音合成。可在设置里接入语音接口')
+    }
   }
   try {
     // never wait longer than the line can plausibly take
@@ -433,6 +445,7 @@ const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAI
 export async function play() {
   if (state.playing) return
   const c = ensureAudio()
+  unlockSpeech()
   const resumed = c.resume()
   audioEl.src = SILENT_WAV
   audioEl.play().catch(() => undefined)

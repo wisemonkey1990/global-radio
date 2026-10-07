@@ -24,6 +24,7 @@ const mmss = (s: number) => {
 const clock = computed(() => (state.sleepMin ? mmss(state.sleepLeft) : mmss(state.elapsed)))
 
 const status = computed(() => {
+  if (state.alert) return state.alert
   if (!state.playing) return '点一个频道开始收听，再点一下停止'
   if (state.tuning) return '调谐中…'
   if (state.djSpeaking) return `${currentHost.value.name} 正在播报`
