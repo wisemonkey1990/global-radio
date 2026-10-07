@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { HOSTS } from '../data'
-import { diagnostics, playLocalFiles, setAmbience, setMains, state } from '../engine'
+import { HOSTS, THEMES } from '../data'
+import { diagnostics, playLocalFiles, setAmbience, setMains, setTheme, state } from '../engine'
 import { ttsReady } from '../voice'
 
 const base = import.meta.env.BASE_URL
@@ -44,6 +44,13 @@ const pctText = (v: number) => (v === 0 ? '关' : `${Math.round(v * 100)}%`)
         <h2>设置</h2>
         <button class="sheet-close" aria-label="关闭" @click="emit('close')">✕</button>
       </header>
+
+      <div class="field">
+        <label>主题 <small>外观风格</small></label>
+        <div class="seg">
+          <button v-for="t in THEMES" :key="t.id" :class="{ on: state.theme === t.id }" @click="setTheme(t.id)">{{ t.label }}</button>
+        </div>
+      </div>
 
       <div class="field">
         <label for="amb">电波干扰 <small>底噪 · 静电 · 哼声 · 串台</small></label>

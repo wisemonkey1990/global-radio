@@ -4,7 +4,7 @@
 import { reactive, watch } from 'vue'
 import { createAmRadio, type AmRadio, type RadioMode } from './audio/amRadio'
 import { startGenerative, type Generative } from './audio/generative'
-import { HOSTS, PRESETS, SLEEP_STEPS, type HostId, type Lang, type PresetId } from './data'
+import { HOSTS, PRESETS, SLEEP_STEPS, THEMES, type HostId, type Lang, type PresetId, type Theme } from './data'
 import { cueLine, djLine } from './dj'
 import { curatedFor, lastStation, loadDirectory, probeStream, rememberStation, type Station } from './stations'
 import { cancelBrowserSpeech, emptyTts, fetchSpeech, speakWithBrowser, ttsReady, unlockSpeech, type TtsConfig } from './voice'
@@ -25,6 +25,7 @@ interface Saved {
   mains: 50 | 60
   ambience: number
   tts: TtsConfig
+  theme: Theme
 }
 
 function load(): Partial<Saved> {
@@ -46,6 +47,7 @@ export const state = reactive({
   /** 0..1.5, scales hiss / static / hum / interference */
   ambience: typeof saved.ambience === 'number' ? saved.ambience : 1,
   tts: { ...emptyTts(), ...saved.tts } as TtsConfig,
+  theme: (THEMES.some((t) => t.id === saved.theme) ? saved.theme : 'dark') as Theme,
 
   playing: false,
   /** true from tuning until the first sound of the new station arrives */
@@ -68,7 +70,7 @@ export const state = reactive({
 })
 
 watch(
-  () => [state.preset, state.host, state.mode, state.lang, state.mains, state.ambience, state.tts],
+  () => [state.preset, state.host, state.mode, state.lang, state.mains, state.ambience, state.tts, state.theme],
   () => {
     const out: Saved = {
       preset: state.preset,
@@ -78,6 +80,7 @@ watch(
       mains: state.mains,
       ambience: state.ambience,
       tts: state.tts,
+      theme: state.theme,
     }
     try {
       localStorage.setItem(STORE_KEY, JSON.stringify(out))
@@ -87,6 +90,19 @@ watch(
   },
   { deep: true },
 )
+
+// ------------------------------------------------------------------ theme
+/** Apply the theme before the first paint (this module is imported before the app mounts). */
+function applyTheme(theme: Theme) {
+  document.documentElement.dataset.theme = theme
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEMES.find((t) => t.id === theme)?.color ?? '#1b1b1b')
+}
+applyTheme(state.theme)
+watch(() => state.theme, applyTheme)
+
+export function setTheme(theme: Theme) {
+  state.theme = theme
+}
 
 // ------------------------------------------------------------------ audio graph (lazy: needs a user gesture)
 let ctx: AudioContext | null = null

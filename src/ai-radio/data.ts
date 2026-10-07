@@ -3,6 +3,7 @@ import type { RadioMode } from './audio/amRadio'
 export type PresetId = 'mood' | 'discover' | 'focus' | 'road' | 'night' | 'oldies' | 'sport'
 export type HostId = 'randy' | 'kevin' | 'iris'
 export type Lang = 'zh' | 'en'
+export type Theme = 'dark' | 'retro'
 
 export interface Preset {
   id: PresetId
@@ -54,6 +55,11 @@ export const MODES: ModeInfo[] = [
   { id: 'clean', label: '原声', angle: -60, desc: '录音棚直出，原本的声音。' },
   { id: 'mw', label: '中波', angle: 0, desc: '早期中波机：单声道、窄频带，嘶嘶底噪、静电噼啪，信号时强时弱。' },
   { id: 'tube', label: '电子管', angle: 60, desc: '电子管收音机：更暖更脏的失真，信号慢慢起伏，隐约的交流哼声。' },
+]
+
+export const THEMES: Array<{ id: Theme; label: string; /** browser UI colour */ color: string }> = [
+  { id: 'dark', label: '深色', color: '#1b1b1b' },
+  { id: 'retro', label: '复古黄', color: '#ecd78f' },
 ]
 
 export const LANGS: Array<{ id: Lang; label: string }> = [
