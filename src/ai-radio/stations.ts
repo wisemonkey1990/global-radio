@@ -44,7 +44,7 @@ export const CURATED: Record<PresetId, Station[]> = {
 
 /**
  * Mainland-China stations hosted on domestic CDNs (Qingting). They need no VPN, send CORS headers,
- * and are tried first when the DJ language is Chinese. The same id is available on three hosts.
+ * and are tried first when the language preference is Chinese. The same id is available on three hosts.
  */
 const qt = (id: number, name: string): Station => ({
   name,
@@ -84,7 +84,7 @@ const GLOBAL_QUERIES: Record<PresetId, Query[]> = {
   jazz: [{ tag: 'jazz' }, { tag: 'smooth jazz' }, { tag: 'bebop' }],
 }
 
-/** Chinese-language music stations, mixed in when the DJ language is Chinese. */
+/** Chinese-language music stations, mixed in when the language preference is Chinese. */
 const CHINESE_QUERIES: Partial<Record<PresetId, Query[]>> = {
   mood: [{ language: 'chinese', tag: 'pop' }],
   discover: [{ language: 'chinese', tag: 'pop' }],

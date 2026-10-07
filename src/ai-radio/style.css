@@ -943,17 +943,6 @@ input:focus-visible {
   box-shadow: inset 1px 2px 4px rgba(var(--sh), 0.5);
 }
 
-.voices {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-
-.voices .text {
-  margin: 0;
-  min-width: 0;
-}
-
 .diag {
   margin-top: 22px;
 }

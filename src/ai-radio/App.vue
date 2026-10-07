@@ -4,14 +4,13 @@ import ModeKnob from './components/ModeKnob.vue'
 import SettingsSheet from './components/SettingsSheet.vue'
 import SleepFader from './components/SleepFader.vue'
 import TuningKnob from './components/TuningKnob.vue'
-import { HOSTS, HOST_FOR, LANGS, MODES, PRESETS, dialText } from './data'
+import { LANGS, MODES, PRESETS, dialText } from './data'
 import { nextStation, setFrequency, setLang, setMode, setSleep, state, togglePlay, tune } from './engine'
 
 const showSettings = ref(false)
 const showLang = ref(false)
 
 const current = computed(() => PRESETS.find((p) => p.id === state.preset) ?? PRESETS[0])
-const currentHost = computed(() => HOSTS.find((h) => h.id === HOST_FOR[state.preset]) ?? HOSTS[0])
 const currentMode = computed(() => MODES.find((m) => m.id === state.mode) ?? MODES[1])
 const dial = computed(() => dialText(state.freq, state.mode))
 const langLabel = computed(() => LANGS.find((l) => l.id === state.lang)?.label ?? '')
@@ -25,11 +24,9 @@ const mmss = (s: number) => {
 const clock = computed(() => (state.sleepMin ? mmss(state.sleepLeft) : mmss(state.elapsed)))
 
 const status = computed(() => {
-  if (state.alert) return state.alert
   if (!state.playing) return '点一个频道开始收听，再点一下停止'
   if (state.tuning) return '调谐中…'
   if (state.source === 'static') return state.note
-  if (state.djSpeaking) return `${currentHost.value.name} 正在播报`
   return state.note
 })
 
@@ -48,8 +45,6 @@ function onKey(e: KeyboardEvent) {
 onMounted(() => {
   document.addEventListener('click', closeLang)
   document.addEventListener('keydown', onKey)
-  // voices load asynchronously in some browsers
-  if ('speechSynthesis' in window) speechSynthesis.getVoices()
 })
 onBeforeUnmount(() => {
   document.removeEventListener('click', closeLang)
@@ -129,7 +124,7 @@ onBeforeUnmount(() => {
 
       <div class="lang" :class="{ open: showLang }">
         <button class="lang-row" :aria-expanded="showLang" @click.stop="showLang = !showLang">
-          <b>语言</b><small>所有台通用</small>
+          <b>语言</b><small>优先收听的电台语言</small>
           <span class="lang-val">{{ langLabel }}<svg viewBox="0 0 12 8" width="12" height="8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1 6.5 6 1.5l5 5" /></svg></span>
         </button>
         <ul v-if="showLang" class="lang-list" role="listbox">
