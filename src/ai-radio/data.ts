@@ -26,7 +26,6 @@ export const PRESETS: Preset[] = [
 export interface Host {
   id: HostId
   name: string
-  desc: string
   /** Web Speech fallback tuning */
   gender: 'm' | 'f'
   pitch: number
@@ -36,10 +35,27 @@ export interface Host {
 }
 
 export const HOSTS: Host[] = [
-  { id: 'randy', name: 'Randy', desc: '男声 · 低沉松弛，懂歌也会聊', gender: 'm', pitch: 0.75, rate: 0.92, ttsVoice: 'onyx' },
-  { id: 'kevin', name: 'Kevin', desc: '男声 · 明朗有劲，节奏感强', gender: 'm', pitch: 1, rate: 1.05, ttsVoice: 'echo' },
-  { id: 'iris', name: 'Iris', desc: '女声 · 温柔沉静，陪你到深夜', gender: 'f', pitch: 1.05, rate: 0.95, ttsVoice: 'nova' },
+  { id: 'randy', name: 'Randy', gender: 'm', pitch: 0.75, rate: 0.92, ttsVoice: 'onyx' },
+  { id: 'kevin', name: 'Kevin', gender: 'm', pitch: 1, rate: 1.05, ttsVoice: 'echo' },
+  { id: 'iris', name: 'Iris', gender: 'f', pitch: 1.05, rate: 0.95, ttsVoice: 'nova' },
 ]
+
+/** Each channel has its own DJ (the host is no longer picked by hand). */
+export const HOST_FOR: Record<PresetId, HostId> = {
+  mood: 'randy',
+  discover: 'kevin',
+  focus: 'iris',
+  road: 'kevin',
+  night: 'iris',
+  oldies: 'randy',
+  sport: 'kevin',
+}
+
+/** The tuning dial covers the FM band; on the AM voices the same position reads freq × 10 kHz. */
+export const FREQ_MIN = 87.5
+export const FREQ_MAX = 108
+/** A channel locks in when the dial is within this many MHz of it (a magnetic detent). */
+export const LOCK_WINDOW = 0.25
 
 export const SLEEP_STEPS = [0, 15, 30, 45, 60, 75, 90]
 
@@ -67,8 +83,8 @@ export const LANGS: Array<{ id: Lang; label: string }> = [
   { id: 'en', label: 'English' },
 ]
 
-export function dialText(preset: Preset, mode: RadioMode) {
+export function dialText(freq: number, mode: RadioMode) {
   return mode === 'clean'
-    ? { band: 'FM', value: preset.freq.toFixed(1), unit: 'MHz' }
-    : { band: 'AM', value: String(Math.round(preset.freq * 10)), unit: 'kHz' }
+    ? { band: 'FM', value: freq.toFixed(1), unit: 'MHz' }
+    : { band: 'AM', value: String(Math.round(freq * 10)), unit: 'kHz' }
 }

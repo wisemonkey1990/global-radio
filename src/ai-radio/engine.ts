@@ -4,8 +4,8 @@
 import { reactive, watch } from 'vue'
 import { createAmRadio, type AmRadio, type RadioMode } from './audio/amRadio'
 import { startGenerative, type Generative } from './audio/generative'
-import { HOSTS, PRESETS, SLEEP_STEPS, THEMES, type HostId, type Lang, type PresetId, type Theme } from './data'
-import { cueLine, djLine } from './dj'
+import { FREQ_MAX, FREQ_MIN, HOSTS, HOST_FOR, LOCK_WINDOW, PRESETS, SLEEP_STEPS, THEMES, type Lang, type PresetId, type Theme } from './data'
+import { djLine } from './dj'
 import { curatedFor, lastStation, loadDirectory, probeStream, rememberStation, type Station } from './stations'
 import { cancelBrowserSpeech, emptyTts, fetchSpeech, speakWithBrowser, ttsReady, unlockSpeech, type TtsConfig } from './voice'
 
@@ -19,7 +19,7 @@ const DUCK_LEVEL = 0.25
 
 interface Saved {
   preset: PresetId
-  host: HostId
+  freq: number
   mode: RadioMode
   lang: Lang
   mains: 50 | 60
@@ -38,9 +38,16 @@ function load(): Partial<Saved> {
 
 const saved = load()
 
+function initialFreq() {
+  const preset = PRESETS.find((p) => p.id === saved.preset) ?? PRESETS[0]
+  const f = saved.freq
+  return typeof f === 'number' && f >= FREQ_MIN && f <= FREQ_MAX ? Math.round(f * 10) / 10 : preset.freq
+}
+
 export const state = reactive({
   preset: (PRESETS.some((p) => p.id === saved.preset) ? saved.preset : 'mood') as PresetId,
-  host: (HOSTS.some((h) => h.id === saved.host) ? saved.host : 'kevin') as HostId,
+  freq: initialFreq(),
+  locked: false,
   mode: (['clean', 'mw', 'tube'].includes(saved.mode as string) ? saved.mode : 'mw') as RadioMode,
   lang: (saved.lang === 'en' ? 'en' : 'zh') as Lang,
   mains: (saved.mains === 60 ? 60 : 50) as 50 | 60,
@@ -52,7 +59,8 @@ export const state = reactive({
   playing: false,
   /** true from tuning until the first sound of the new station arrives */
   tuning: false,
-  source: '' as '' | 'stream' | 'house' | 'local',
+  /** 'static' = the dial is between stations: only radio noise */
+  source: '' as '' | 'stream' | 'house' | 'local' | 'static',
   /** name of the station currently on the air (stream source) */
   station: '',
   note: '',
@@ -66,15 +74,23 @@ export const state = reactive({
   alert: '',
   /** recent audio events, shown in Settings → 诊断信息 to help debug device-specific problems */
   log: [] as string[],
-  cueHost: '' as HostId | '',
 })
 
+{
+  const hit = PRESETS.find((p) => Math.abs(p.freq - state.freq) <= LOCK_WINDOW)
+  if (hit) {
+    state.freq = hit.freq
+    state.preset = hit.id
+    state.locked = true
+  }
+}
+
 watch(
-  () => [state.preset, state.host, state.mode, state.lang, state.mains, state.ambience, state.tts, state.theme],
+  () => [state.preset, state.freq, state.mode, state.lang, state.mains, state.ambience, state.tts, state.theme],
   () => {
     const out: Saved = {
       preset: state.preset,
-      host: state.host,
+      freq: state.freq,
       mode: state.mode,
       lang: state.lang,
       mains: state.mains,
@@ -225,7 +241,7 @@ function flash(message: string) {
 }
 
 const preset = () => PRESETS.find((p) => p.id === state.preset) ?? PRESETS[0]
-const host = (id: HostId | '' = state.host) => HOSTS.find((h) => h.id === id) ?? HOSTS[0]
+const host = () => HOSTS.find((h) => h.id === HOST_FOR[state.preset]) ?? HOSTS[0]
 
 // ------------------------------------------------------------------ sources
 function stopSources() {
@@ -429,7 +445,6 @@ function onVisibility() {
     if (state.djSpeaking) {
       stopVoice()
       state.djSpeaking = false
-      state.cueHost = ''
       duck(false)
     }
     return
@@ -439,6 +454,7 @@ function onVisibility() {
     if (audioEl.paused) audioEl.play().catch(() => undefined)
     return
   }
+  if (state.source === 'static') return
   const live = state.source === 'stream' && !audioEl.paused && !audioEl.ended && audioEl.readyState >= 3
   if (state.tuning || live) return
   // stalled stream, or the built-in band standing in while we were away: go back to a real station
@@ -469,6 +485,7 @@ function scheduleDj(seconds: number) {
   djTimer = window.setTimeout(async () => {
     if (!state.playing) return
     if (state.tuning) return scheduleDj(3) // let the station come in first
+    if (state.source === 'static') return scheduleDj(20) // nobody to talk over
     await speak(djLine(state.lang, preset(), host()), host())
     scheduleDj(240 + Math.random() * 120)
   }, seconds * 1000)
@@ -539,7 +556,6 @@ function silenceDj() {
   clearTimeout(djTimer)
   stopVoice()
   state.djSpeaking = false
-  state.cueHost = ''
   if (ctx) musicGain.gain.setTargetAtTime(1, ctx.currentTime, 0.05)
 }
 
@@ -602,10 +618,23 @@ export async function play() {
   updateMediaSession()
 }
 
+/** The preset whose station is on the air (or being connected). */
+let tunedPreset: PresetId | '' = ''
+
+function goStatic() {
+  tunedPreset = ''
+  state.source = 'static'
+  state.station = ''
+  state.tuning = false
+  state.note = '电台之间只有电波噪声 · 转动旋钮对准一个频道'
+}
+
 function startSource() {
   radio?.tuneSweep()
-  if (localQueue.length) playLocalAt(localIndex)
-  else void startStream()
+  if (localQueue.length) return playLocalAt(localIndex)
+  if (!state.locked) return goStatic()
+  tunedPreset = state.preset
+  void startStream()
 }
 
 export function pause() {
@@ -637,12 +666,17 @@ export function togglePlay() {
 }
 
 export async function tune(id: PresetId) {
-  const changed = id !== state.preset
+  const p = PRESETS.find((x) => x.id === id) ?? PRESETS[0]
+  const sameChannel = state.locked && id === state.preset
   state.preset = id
+  state.freq = p.freq // the dial jumps to the channel
+  state.locked = true
+  clearTimeout(settleTimer)
   localQueue = []
   localIndex = 0
   if (!state.playing) return play()
-  if (!changed && state.source !== 'local') return pause() // tapping the playing channel again stops it
+  // tapping the channel that is on the air again stops it
+  if (sameChannel && state.source !== 'local' && state.source !== 'static') return pause()
   state.tuning = true
   clearTimeout(djTimer)
   cancelBrowserSpeech()
@@ -654,7 +688,7 @@ export async function tune(id: PresetId) {
 
 /** Dial on to another station of the current preset. */
 export function nextStation() {
-  if (!state.playing || state.source === 'local') return
+  if (!state.playing || state.source === 'local' || state.source === 'static') return
   state.tuning = true
   clearTimeout(djTimer)
   cancelBrowserSpeech()
@@ -664,8 +698,45 @@ export function nextStation() {
   scheduleDj(6)
 }
 
-export function setHost(id: HostId) {
-  state.host = id
+let settleTimer = 0
+
+/**
+ * The tuning knob. The dial snaps to a channel when it gets close (a detent) and the station is
+ * connected once the knob has rested for a moment; anywhere else there is only radio noise.
+ */
+export function setFrequency(raw: number) {
+  let f = Math.round(Math.min(FREQ_MAX, Math.max(FREQ_MIN, raw)) * 10) / 10
+  const hit = PRESETS.find((p) => Math.abs(p.freq - f) <= LOCK_WINDOW)
+  if (hit) f = hit.freq
+  if (f === state.freq && !!hit === state.locked) return
+  if (hit && !state.locked) navigator.vibrate?.(8) // a small click when a channel catches
+  state.freq = f
+  state.locked = !!hit
+  if (hit) state.preset = hit.id
+  clearTimeout(settleTimer)
+  settleTimer = window.setTimeout(settle, 350)
+}
+
+function settle() {
+  if (!state.playing) return
+  if (state.locked) {
+    if (tunedPreset === state.preset && (state.source === 'stream' || state.source === 'house')) return
+    localQueue = []
+    localIndex = 0
+    state.tuning = true
+    clearTimeout(djTimer)
+    cancelBrowserSpeech()
+    stopSources()
+    startSource()
+    scheduleDj(5)
+    updateMediaSession()
+  } else if (state.source !== 'local' && state.source !== 'static') {
+    clearTimeout(djTimer)
+    cancelBrowserSpeech()
+    stopSources()
+    radio?.tuneSweep()
+    goStatic()
+  }
 }
 
 export function setMode(mode: RadioMode) {
@@ -693,20 +764,6 @@ export function setMains(hz: 50 | 60) {
 export function setAmbience(amount: number) {
   state.ambience = amount
   radio?.setAmbience(amount)
-}
-
-/** CUE: audition a host's voice, even while the radio is off. */
-export async function cue(id: HostId) {
-  if (state.cueHost) return
-  const c = ensureAudio()
-  await c.resume()
-  state.cueHost = id
-  try {
-    await speak(cueLine(state.lang, host(id)), host(id))
-  } finally {
-    state.cueHost = ''
-    if (!state.playing) window.setTimeout(() => !state.playing && c.suspend(), 300)
-  }
 }
 
 export async function playLocalFiles(files: File[]) {
