@@ -4,7 +4,7 @@ import ModeKnob from './components/ModeKnob.vue'
 import SettingsSheet from './components/SettingsSheet.vue'
 import SleepFader from './components/SleepFader.vue'
 import { HOSTS, LANGS, MODES, PRESETS, dialText } from './data'
-import { cue, setHost, setLang, setMode, setSleep, state, togglePlay, tune } from './engine'
+import { cue, nextStation, setHost, setLang, setMode, setSleep, state, togglePlay, tune } from './engine'
 
 const showSettings = ref(false)
 const showLang = ref(false)
@@ -73,7 +73,7 @@ onBeforeUnmount(() => {
     </header>
 
     <section class="dial" aria-live="polite">
-      <div class="freq">
+      <div class="freq" :class="{ long: dial.value.length > 3 }">
         <span class="band">{{ dial.band }}</span>
         <span class="num">{{ dial.value }}</span>
         <span class="unit">{{ dial.unit }}</span>
@@ -94,7 +94,10 @@ onBeforeUnmount(() => {
     <section class="panel">
       <div class="panel-head">
         <span class="cap">PRESETS<small>快捷调频</small></span>
-        <span class="cap">{{ dial.band }} {{ dial.value }}</span>
+        <span class="cap">
+          <button v-if="state.playing && state.source !== 'local'" class="next" aria-label="换一个电台" @click="nextStation()">↻ 换台</button>
+          {{ dial.band }} {{ dial.value }}
+        </span>
       </div>
       <div class="presets">
         <button v-for="p in PRESETS" :key="p.id" class="key preset" :class="{ active: p.id === state.preset }" @click="tune(p.id)">

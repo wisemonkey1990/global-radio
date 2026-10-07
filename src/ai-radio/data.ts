@@ -10,18 +10,16 @@ export interface Preset {
   freq: number
   name: string
   tagline: string
-  /** SomaFM channels tried in order (their Icecast servers send CORS headers, which Web Audio needs). */
-  stations: Array<{ id: string; name: string }>
 }
 
 export const PRESETS: Preset[] = [
-  { id: 'mood', freq: 89.6, name: '随心', tagline: '看时间、看状态，熟悉的和新鲜的搭着放', stations: [{ id: 'groovesalad', name: 'Groove Salad' }, { id: 'groovesalad2', name: 'Groove Salad 2' }] },
-  { id: 'discover', freq: 92.3, name: '新发现', tagline: '没听过的歌，也许正合你意', stations: [{ id: 'indiepop', name: 'Indie Pop Rocks!' }, { id: 'folkfwd', name: 'Folk Forward' }] },
-  { id: 'focus', freq: 95.1, name: '专注', tagline: '少一点起伏，多一点心流', stations: [{ id: 'dronezone', name: 'Drone Zone' }, { id: 'deepspaceone', name: 'Deep Space One' }] },
-  { id: 'road', freq: 98.4, name: '在路上', tagline: '窗外的风景，配上合适的节拍', stations: [{ id: 'seventies', name: 'Left Coast 70s' }, { id: 'u80s', name: 'Underground 80s' }] },
-  { id: 'night', freq: 101.7, name: '深夜', tagline: '夜深了，音量放轻，慢慢听', stations: [{ id: 'lush', name: 'Lush' }, { id: 'sonicuniverse', name: 'Sonic Universe' }] },
-  { id: 'oldies', freq: 104.5, name: '老歌', tagline: '经得起时间的那些旋律', stations: [{ id: '7soul', name: 'Seven Inch Soul' }, { id: 'illstreet', name: 'Illinois Street Lounge' }] },
-  { id: 'sport', freq: 107.2, name: '运动', tagline: '心率拉起来，节拍跟上', stations: [{ id: 'poptron', name: 'PopTron' }, { id: 'beatblender', name: 'Beat Blender' }] },
+  { id: 'mood', freq: 89.6, name: '随心', tagline: '看时间、看状态，熟悉的和新鲜的搭着放' },
+  { id: 'discover', freq: 92.3, name: '新发现', tagline: '没听过的歌，也许正合你意' },
+  { id: 'focus', freq: 95.1, name: '专注', tagline: '少一点起伏，多一点心流' },
+  { id: 'road', freq: 98.4, name: '在路上', tagline: '窗外的风景，配上合适的节拍' },
+  { id: 'night', freq: 101.7, name: '深夜', tagline: '夜深了，音量放轻，慢慢听' },
+  { id: 'oldies', freq: 104.5, name: '老歌', tagline: '经得起时间的那些旋律' },
+  { id: 'sport', freq: 107.2, name: '运动', tagline: '心率拉起来，节拍跟上' },
 ]
 
 export interface Host {

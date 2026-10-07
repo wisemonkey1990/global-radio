@@ -181,6 +181,10 @@ input:focus-visible {
   text-shadow: 0 0 22px rgba(255, 220, 190, 0.18);
 }
 
+.freq.long .num {
+  font-size: 66px;
+}
+
 .meter {
   display: flex;
   align-items: flex-end;
@@ -278,6 +282,21 @@ input:focus-visible {
   font: 400 13px/1 var(--sans);
   letter-spacing: 0.04em;
   color: #5b5b5b;
+}
+
+.cap .next {
+  margin-right: 14px;
+  padding: 4px 9px;
+  border-radius: 10px;
+  background: #2a2a2a;
+  font: 500 11px/1 var(--sans);
+  letter-spacing: 0.05em;
+  color: #9a9a9a;
+  box-shadow: 2px 3px 6px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.cap .next:active {
+  transform: translateY(1px);
 }
 
 .key {
@@ -860,6 +879,9 @@ input:focus-visible {
 @media (max-width: 380px) {
   .freq .num {
     font-size: 70px;
+  }
+  .freq.long .num {
+    font-size: 56px;
   }
   .brand {
     letter-spacing: 0.2em;
