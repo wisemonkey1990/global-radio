@@ -1,14 +1,84 @@
 :root {
-  --bg: #1a1a1a;
-  --panel: #222;
-  --text: #dcdcdc;
-  --muted: #7c7c7c;
-  --faint: #4a4a4a;
+  /* page */
+  --page-a: #262626;
+  --page-b: #1a1a1a;
+  --page-c: #141414;
+  /* surfaces, darkest to lightest */
+  --well-deep: #151515;
+  --well: #1a1a1a;
+  --surface-low: #202020;
+  --surface: #232323;
+  --surface-high: #2a2a2a;
+  --surface-raise: #2d2d2d;
+  --surface-top: #353535;
+  --line: #444;
+  /* text, faintest to strongest */
+  --text-8: #5c5c5c;
+  --text-6: #6d6d6d;
+  --text-4: #8a8a8a;
+  --text-3: #9a9a9a;
+  --text-2: #d0d0d0;
+  --text-1: #e4e4e4;
+  --text-hi: #fff;
+  /* shadows and highlights as r, g, b */
+  --sh: 0, 0, 0;
+  --hi: 255, 255, 255;
+  --glow-rgb: 255, 220, 190;
+  /* knob / fader hardware */
+  --knob-a: #3b3b3b;
+  --knob-b: #1f1f1f;
+  --thumb-a: #3a3a3a;
+  --thumb-b: #272727;
+  --groove: #151515;
+  /* accents */
   --accent: #ff5a33;
+  --accent-rgb: 255, 90, 51;
+  --accent-hi: #ff7a4d;
+  --accent-lo: #e0471f;
+  --led-off: #4a2a24;
   --amber: #d9a13b;
+  --amber-dim: #a98733;
   --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
   --sans: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Roboto, sans-serif;
   color-scheme: dark;
+}
+
+/* Retro yellow: a cream and mustard Bakelite table radio, brown print, vermilion lamp */
+:root[data-theme='retro'] {
+  --page-a: #f6e7ae;
+  --page-b: #ecd78f;
+  --page-c: #dcc271;
+  --well-deep: #c2a552;
+  --well: #d3b765;
+  --surface-low: #e6d085;
+  --surface: #ecd994;
+  --surface-high: #f0dd9d;
+  --surface-raise: #f4e4a8;
+  --surface-top: #f9ecbd;
+  --line: #b99a45;
+  --text-8: #a98d4c;
+  --text-6: #8c7138;
+  --text-4: #75592a;
+  --text-3: #644a1d;
+  --text-2: #4a3412;
+  --text-1: #3a280b;
+  --text-hi: #26180a;
+  --sh: 92, 62, 10;
+  --hi: 255, 251, 228;
+  --glow-rgb: 205, 120, 40;
+  --knob-a: #86602d;
+  --knob-b: #4a2f10;
+  --thumb-a: #8a642f;
+  --thumb-b: #5b3a15;
+  --groove: #2a1806;
+  --accent: #cf3a17;
+  --accent-rgb: 207, 58, 23;
+  --accent-hi: #e8613a;
+  --accent-lo: #a42a0e;
+  --led-off: #c79a78;
+  --amber: #9a5a08;
+  --amber-dim: #8a5a1c;
+  color-scheme: light;
 }
 
 * {
@@ -19,8 +89,9 @@
 html,
 body {
   margin: 0;
-  background: radial-gradient(120% 70% at 50% 0%, #262626 0%, #1a1a1a 55%, #141414 100%) fixed;
-  color: var(--text);
+  background-color: var(--page-c);
+  background: radial-gradient(120% 70% at 50% 0%, var(--page-a) 0%, var(--page-b) 55%, var(--page-c) 100%) fixed;
+  color: var(--text-2);
   font-family: var(--sans);
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
@@ -38,7 +109,7 @@ button {
 button:focus-visible,
 [tabindex]:focus-visible,
 input:focus-visible {
-  outline: 2px solid rgba(255, 90, 51, 0.7);
+  outline: 2px solid rgba(var(--accent-rgb), 0.7);
   outline-offset: 2px;
 }
 
@@ -57,7 +128,7 @@ input:focus-visible {
   height: 5px;
   border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 6px rgba(255, 90, 51, 0.9);
+  box-shadow: 0 0 6px rgba(var(--accent-rgb), 0.9);
   flex: none;
 }
 
@@ -72,12 +143,12 @@ input:focus-visible {
 .brand {
   font: 500 11px/1 var(--mono);
   letter-spacing: 0.32em;
-  color: #8a8a8a;
+  color: var(--text-4);
   white-space: nowrap;
 }
 
 .brand span {
-  color: #5e5e5e;
+  color: var(--text-8);
 }
 
 .onair {
@@ -88,23 +159,23 @@ input:focus-visible {
   height: 34px;
   padding: 0 14px;
   border-radius: 17px;
-  background: #202020;
-  box-shadow: inset 2px 3px 6px rgba(0, 0, 0, 0.55), inset -1px -1px 3px rgba(255, 255, 255, 0.03);
+  background: var(--surface-low);
+  box-shadow: inset 2px 3px 6px rgba(var(--sh), 0.55), inset -1px -1px 3px rgba(var(--hi), 0.03);
   font: 500 11px/1 var(--mono);
   letter-spacing: 0.2em;
-  color: #5d5d5d;
+  color: var(--text-8);
   white-space: nowrap;
 }
 
 .onair .led {
-  background: #4a2a24;
+  background: var(--led-off);
   box-shadow: none;
 }
 
 .onair em {
   width: 1px;
   height: 12px;
-  background: #3a3a3a;
+  background: var(--surface-top);
 }
 
 .onair time {
@@ -114,12 +185,12 @@ input:focus-visible {
 }
 
 .onair.live {
-  color: #9a9a9a;
+  color: var(--text-3);
 }
 
 .onair.live .led {
   background: var(--accent);
-  box-shadow: 0 0 8px rgba(255, 90, 51, 0.95);
+  box-shadow: 0 0 8px rgba(var(--accent-rgb), 0.95);
   animation: pulse 2.4s ease-in-out infinite;
 }
 
@@ -136,12 +207,12 @@ input:focus-visible {
   place-items: center;
   width: 34px;
   height: 34px;
-  color: #6c6c6c;
+  color: var(--text-6);
   border-radius: 50%;
 }
 
 .gear:hover {
-  color: #aaa;
+  color: var(--text-3);
 }
 
 /* ---------------------------------------------------------------- dial */
@@ -163,7 +234,7 @@ input:focus-visible {
 .freq .unit {
   font: 500 12px/1 var(--mono);
   letter-spacing: 0.16em;
-  color: #5c5c5c;
+  color: var(--text-8);
 }
 
 .freq .num {
@@ -171,14 +242,14 @@ input:focus-visible {
   line-height: 0.95;
   font-weight: 200;
   letter-spacing: 0.01em;
-  color: #8d8d8d;
+  color: var(--text-4);
   font-variant-numeric: tabular-nums;
   transition: color 0.4s, text-shadow 0.4s;
 }
 
 .on .freq .num {
-  color: #ededed;
-  text-shadow: 0 0 22px rgba(255, 220, 190, 0.18);
+  color: var(--text-1);
+  text-shadow: 0 0 22px rgba(var(--glow-rgb), 0.18);
 }
 
 .freq.long .num {
@@ -202,23 +273,23 @@ input:focus-visible {
 .bars i {
   width: 3px;
   border-radius: 1.5px;
-  background: #3a3a3a;
+  background: var(--surface-top);
   transition: background 0.3s;
 }
 
 .bars i.lit {
-  background: #8e8e8e;
+  background: var(--text-4);
 }
 
 .on .bars i.lit {
-  background: #c9c9c9;
+  background: var(--text-2);
 }
 
 .badge {
   font: 500 10px/1 var(--mono);
   letter-spacing: 0.2em;
-  color: #7c7c7c;
-  border: 1px solid #444;
+  color: var(--text-4);
+  border: 1px solid var(--line);
   border-radius: 3px;
   padding: 6px 7px 6px 9px;
 }
@@ -228,13 +299,13 @@ input:focus-visible {
   display: flex;
   align-items: baseline;
   gap: 12px;
-  color: var(--muted);
+  color: var(--text-4);
   font-size: 14px;
   line-height: 1.4;
 }
 
 .now b {
-  color: #cfcfcf;
+  color: var(--text-2);
   font-size: 17px;
   font-weight: 600;
   white-space: nowrap;
@@ -245,7 +316,7 @@ input:focus-visible {
   min-height: 16px;
   font: 400 11px/16px var(--mono);
   letter-spacing: 0.06em;
-  color: #666;
+  color: var(--text-6);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -261,8 +332,8 @@ input:focus-visible {
   margin: 14px 14px 0;
   padding: 26px 18px 22px;
   border-radius: 34px;
-  background: linear-gradient(180deg, #252525 0%, #202020 100%);
-  box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.06) inset, 0 20px 40px rgba(0, 0, 0, 0.35);
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-low) 100%);
+  box-shadow: 0 -1px 0 rgba(var(--hi), 0.06) inset, 0 20px 40px rgba(var(--sh), 0.35);
 }
 
 .panel-head {
@@ -274,25 +345,25 @@ input:focus-visible {
 .cap {
   font: 500 12px/1 var(--mono);
   letter-spacing: 0.3em;
-  color: #8a8a8a;
+  color: var(--text-4);
 }
 
 .cap small {
   margin-left: 14px;
   font: 400 13px/1 var(--sans);
   letter-spacing: 0.04em;
-  color: #5b5b5b;
+  color: var(--text-8);
 }
 
 .cap .next {
   margin-right: 14px;
   padding: 4px 9px;
   border-radius: 10px;
-  background: #2a2a2a;
+  background: var(--surface-high);
   font: 500 11px/1 var(--sans);
   letter-spacing: 0.05em;
-  color: #9a9a9a;
-  box-shadow: 2px 3px 6px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  color: var(--text-3);
+  box-shadow: 2px 3px 6px rgba(var(--sh), 0.4), inset 0 1px 0 rgba(var(--hi), 0.05);
 }
 
 .cap .next:active {
@@ -302,9 +373,9 @@ input:focus-visible {
 .key {
   position: relative;
   border-radius: 16px;
-  background: linear-gradient(160deg, #2d2d2d, #232323);
-  box-shadow: 5px 7px 14px rgba(0, 0, 0, 0.45), -3px -3px 8px rgba(255, 255, 255, 0.022), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  color: #9a9a9a;
+  background: linear-gradient(160deg, var(--surface-raise), var(--surface));
+  box-shadow: 5px 7px 14px rgba(var(--sh), 0.45), -3px -3px 8px rgba(var(--hi), 0.022), inset 0 1px 0 rgba(var(--hi), 0.05);
+  color: var(--text-3);
   transition: box-shadow 0.15s, background 0.15s, color 0.15s, transform 0.1s;
 }
 
@@ -313,9 +384,9 @@ input:focus-visible {
 }
 
 .key.active {
-  color: #f1f1f1;
-  background: linear-gradient(160deg, #2a2a2a, #212121);
-  box-shadow: inset 3px 4px 8px rgba(0, 0, 0, 0.5), inset -2px -2px 5px rgba(255, 255, 255, 0.03), 0 0 0 1px rgba(255, 255, 255, 0.025);
+  color: var(--text-hi);
+  background: linear-gradient(160deg, var(--surface-high), var(--surface-low));
+  box-shadow: inset 3px 4px 8px rgba(var(--sh), 0.5), inset -2px -2px 5px rgba(var(--hi), 0.03), 0 0 0 1px rgba(var(--hi), 0.025);
 }
 
 .presets {
@@ -341,11 +412,11 @@ input:focus-visible {
   height: 11px;
   font: 400 11px/1 var(--mono);
   letter-spacing: 0.06em;
-  color: #5c5c5c;
+  color: var(--text-8);
 }
 
 .preset.active small {
-  color: #8c8c8c;
+  color: var(--text-4);
 }
 
 .sec {
@@ -355,14 +426,14 @@ input:focus-visible {
   margin: 30px 4px 14px;
   font-size: 20px;
   font-weight: 600;
-  color: #e4e4e4;
+  color: var(--text-1);
   white-space: nowrap;
 }
 
 .sec small {
   font-size: 13.5px;
   font-weight: 400;
-  color: #6d6d6d;
+  color: var(--text-6);
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -401,16 +472,16 @@ input:focus-visible {
   gap: 14px;
   height: 36px;
   border-radius: 13px;
-  background: #1a1a1a;
-  box-shadow: inset 2px 3px 6px rgba(0, 0, 0, 0.6), inset -1px -1px 2px rgba(255, 255, 255, 0.03);
+  background: var(--well);
+  box-shadow: inset 2px 3px 6px rgba(var(--sh), 0.6), inset -1px -1px 2px rgba(var(--hi), 0.03);
   font: 600 12px/1 var(--mono);
   letter-spacing: 0.22em;
-  color: #4d4d4d;
+  color: var(--text-8);
   transition: color 0.2s;
 }
 
 .cue.lit {
-  color: #a98733;
+  color: var(--amber-dim);
 }
 
 .cue:hover {
@@ -463,7 +534,7 @@ input:focus-visible {
   max-width: 168px;
   font-size: 13px;
   line-height: 1.6;
-  color: #8a8a8a;
+  color: var(--text-4);
 }
 
 .knob-block {
@@ -481,8 +552,8 @@ input:focus-visible {
   height: 62px;
   margin: -31px 0 0 -31px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 28%, #3b3b3b, #1f1f1f 70%);
-  box-shadow: 6px 9px 16px rgba(0, 0, 0, 0.55), -2px -2px 6px rgba(255, 255, 255, 0.03), inset 0 1px 1px rgba(255, 255, 255, 0.09);
+  background: radial-gradient(circle at 35% 28%, var(--knob-a), var(--knob-b) 70%);
+  box-shadow: 6px 9px 16px rgba(var(--sh), 0.55), -2px -2px 6px rgba(var(--hi), 0.03), inset 0 1px 1px rgba(var(--hi), 0.09);
   touch-action: none;
   cursor: grab;
 }
@@ -502,8 +573,8 @@ input:focus-visible {
   height: 14px;
   margin-left: -2px;
   border-radius: 2px;
-  background: linear-gradient(#ff7a4d, #e0471f);
-  box-shadow: 0 0 5px rgba(255, 90, 51, 0.5);
+  background: linear-gradient(var(--accent-hi), var(--accent-lo));
+  box-shadow: 0 0 5px rgba(var(--accent-rgb), 0.5);
 }
 
 .knob-label {
@@ -513,12 +584,12 @@ input:focus-visible {
   gap: 7px;
   padding: 6px 4px;
   font-size: 14px;
-  color: #6c6c6c;
+  color: var(--text-6);
   white-space: nowrap;
 }
 
 .knob-label.active {
-  color: #e6e6e6;
+  color: var(--text-1);
 }
 
 .knob-label.pos-clean {
@@ -544,8 +615,8 @@ input:focus-visible {
   position: relative;
   height: 92px;
   border-radius: 22px;
-  background: #1c1c1c;
-  box-shadow: inset 3px 4px 9px rgba(0, 0, 0, 0.6), inset -1px -1px 3px rgba(255, 255, 255, 0.03);
+  background: var(--well);
+  box-shadow: inset 3px 4px 9px rgba(var(--sh), 0.6), inset -1px -1px 3px rgba(var(--hi), 0.03);
   touch-action: none;
   cursor: pointer;
 }
@@ -559,18 +630,18 @@ input:focus-visible {
   gap: 6px;
   transform: translateX(-50%);
   font: 500 13px/1 var(--mono);
-  color: #7a7a7a;
+  color: var(--text-4);
 }
 
 .fader-scale span.on {
-  color: #d8d8d8;
+  color: var(--text-2);
 }
 
 .fader-scale i {
   width: 2px;
   height: 12px;
   border-radius: 1px;
-  background: #4a4a4a;
+  background: var(--line);
 }
 
 .fader-slot {
@@ -580,8 +651,8 @@ input:focus-visible {
   top: 58px;
   height: 8px;
   border-radius: 4px;
-  background: #151515;
-  box-shadow: inset 0 2px 3px #000, 0 1px 0 rgba(255, 255, 255, 0.04);
+  background: var(--well-deep);
+  box-shadow: inset 0 2px 3px rgb(var(--sh)), 0 1px 0 rgba(var(--hi), 0.04);
 }
 
 .fader-thumb {
@@ -595,8 +666,8 @@ input:focus-visible {
   justify-content: center;
   gap: 4px;
   border-radius: 10px;
-  background: linear-gradient(160deg, #3a3a3a, #272727);
-  box-shadow: 4px 6px 10px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  background: linear-gradient(160deg, var(--thumb-a), var(--thumb-b));
+  box-shadow: 4px 6px 10px rgba(var(--sh), 0.55), inset 0 1px 0 rgba(var(--hi), 0.08);
   transition: left 0.18s cubic-bezier(0.3, 1.3, 0.5, 1);
   pointer-events: none;
 }
@@ -605,8 +676,8 @@ input:focus-visible {
   width: 2px;
   height: 18px;
   border-radius: 1px;
-  background: #151515;
-  box-shadow: 1px 0 0 rgba(255, 255, 255, 0.07);
+  background: var(--groove);
+  box-shadow: 1px 0 0 rgba(var(--hi), 0.07);
 }
 
 /* ---------------------------------------------------------------- language */
@@ -622,20 +693,20 @@ input:focus-visible {
   width: 100%;
   padding: 19px 26px;
   border-radius: 24px;
-  background: linear-gradient(160deg, #292929, #222);
-  box-shadow: 4px 6px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  background: linear-gradient(160deg, var(--surface-high), var(--surface-low));
+  box-shadow: 4px 6px 12px rgba(var(--sh), 0.4), inset 0 1px 0 rgba(var(--hi), 0.05);
   text-align: left;
 }
 
 .lang-row b {
   font-size: 20px;
   font-weight: 600;
-  color: #e4e4e4;
+  color: var(--text-1);
 }
 
 .lang-row small {
   font-size: 13.5px;
-  color: #6d6d6d;
+  color: var(--text-6);
 }
 
 .lang-val {
@@ -644,12 +715,12 @@ input:focus-visible {
   gap: 12px;
   margin-left: auto;
   font-size: 18px;
-  color: #e4e4e4;
+  color: var(--text-1);
   align-self: center;
 }
 
 .lang-val svg {
-  color: #a0a0a0;
+  color: var(--text-3);
   transition: transform 0.2s;
 }
 
@@ -666,8 +737,8 @@ input:focus-visible {
   padding: 6px;
   list-style: none;
   border-radius: 18px;
-  background: #2b2b2b;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  background: var(--surface-high);
+  box-shadow: 0 12px 30px rgba(var(--sh), 0.55), inset 0 1px 0 rgba(var(--hi), 0.06);
   z-index: 5;
 }
 
@@ -675,13 +746,13 @@ input:focus-visible {
   padding: 13px 16px;
   border-radius: 12px;
   font-size: 16px;
-  color: #a8a8a8;
+  color: var(--text-3);
   cursor: pointer;
 }
 
 .lang-list li.on {
-  color: #fff;
-  background: #353535;
+  color: var(--text-hi);
+  background: var(--surface-top);
 }
 
 /* ---------------------------------------------------------------- settings sheet */
@@ -692,7 +763,7 @@ input:focus-visible {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(var(--sh), 0.55);
   backdrop-filter: blur(3px);
   user-select: auto;
   -webkit-user-select: auto;
@@ -705,8 +776,8 @@ input:focus-visible {
   overflow-y: auto;
   padding: 22px 22px max(env(safe-area-inset-bottom), 22px);
   border-radius: 28px 28px 0 0;
-  background: #232323;
-  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  background: var(--surface);
+  box-shadow: 0 -12px 40px rgba(var(--sh), 0.5), inset 0 1px 0 rgba(var(--hi), 0.06);
   animation: rise 0.25s ease-out;
 }
 
@@ -726,8 +797,8 @@ input:focus-visible {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  color: #8a8a8a;
-  background: #2c2c2c;
+  color: var(--text-4);
+  background: var(--surface-raise);
 }
 
 .field {
@@ -739,14 +810,14 @@ input:focus-visible {
   margin-bottom: 10px;
   font-size: 15px;
   font-weight: 600;
-  color: #dedede;
+  color: var(--text-2);
 }
 
 .field label small {
   margin-left: 8px;
   font-size: 12.5px;
   font-weight: 400;
-  color: #707070;
+  color: var(--text-6);
 }
 
 .range-row {
@@ -763,7 +834,7 @@ input:focus-visible {
 .range-row output {
   width: 44px;
   font: 500 13px/1 var(--mono);
-  color: #a0a0a0;
+  color: var(--text-3);
   text-align: right;
 }
 
@@ -771,27 +842,27 @@ input:focus-visible {
   display: inline-flex;
   padding: 3px;
   border-radius: 12px;
-  background: #1a1a1a;
+  background: var(--well);
 }
 
 .seg button {
   padding: 9px 20px;
   border-radius: 10px;
   font: 500 13px/1 var(--mono);
-  color: #7a7a7a;
+  color: var(--text-4);
 }
 
 .seg button.on {
-  color: #fff;
-  background: #353535;
+  color: var(--text-hi);
+  background: var(--surface-top);
 }
 
 .wide {
   width: 100%;
   padding: 13px;
   border-radius: 14px;
-  background: #2c2c2c;
-  color: #cfcfcf;
+  background: var(--surface-raise);
+  color: var(--text-2);
   font-size: 14px;
 }
 
@@ -799,12 +870,12 @@ input:focus-visible {
   margin: 0 0 10px;
   font-size: 12.5px;
   line-height: 1.6;
-  color: #777;
+  color: var(--text-6);
 }
 
 .hint code {
   font: 12px var(--mono);
-  color: #9a9a9a;
+  color: var(--text-3);
 }
 
 .text {
@@ -813,10 +884,10 @@ input:focus-visible {
   padding: 11px 13px;
   border: 0;
   border-radius: 12px;
-  background: #1a1a1a;
-  color: #d0d0d0;
+  background: var(--well);
+  color: var(--text-2);
   font: 13px var(--mono);
-  box-shadow: inset 1px 2px 4px rgba(0, 0, 0, 0.5);
+  box-shadow: inset 1px 2px 4px rgba(var(--sh), 0.5);
 }
 
 .voices {
@@ -830,15 +901,48 @@ input:focus-visible {
   min-width: 0;
 }
 
+.diag {
+  margin-top: 22px;
+}
+
+.diag summary {
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.diag summary small {
+  margin-left: 8px;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--text-6);
+}
+
+.diag pre {
+  max-height: 220px;
+  margin: 12px 0 10px;
+  padding: 12px;
+  overflow: auto;
+  border-radius: 12px;
+  background: var(--well);
+  font: 11px/1.5 var(--mono);
+  color: var(--text-3);
+  white-space: pre-wrap;
+  word-break: break-all;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 .credit {
   margin: 24px 0 0;
   font-size: 12px;
   line-height: 1.6;
-  color: #666;
+  color: var(--text-6);
 }
 
 .credit a {
-  color: #8d8d8d;
+  color: var(--text-4);
 }
 
 /* ---------------------------------------------------------------- motion */
@@ -852,10 +956,10 @@ input:focus-visible {
   0%,
   86%,
   100% {
-    color: #5d5d5d;
+    color: var(--text-8);
   }
   92% {
-    color: #c4c4c4;
+    color: var(--text-2);
   }
 }
 
