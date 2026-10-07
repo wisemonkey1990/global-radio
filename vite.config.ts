@@ -44,7 +44,7 @@ export default defineConfig({
       manifest: {
         name: 'AI 电台 - GlobalRadio',
         short_name: 'AI 电台',
-        description: 'AI 电台：七个快捷调频、三位 DJ，音质旋钮可调成老式中波 / 电子管收音机',
+        description: 'AI 电台：八个快捷调频、三位 DJ，音质旋钮可调成老式中波 / 电子管收音机',
         theme_color: '#1b1b1b',
         background_color: '#1a1a1a',
         display: 'standalone',

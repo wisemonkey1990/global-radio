@@ -1,6 +1,6 @@
 import type { RadioMode } from './audio/amRadio'
 
-export type PresetId = 'mood' | 'discover' | 'focus' | 'road' | 'night' | 'oldies' | 'sport'
+export type PresetId = 'mood' | 'discover' | 'focus' | 'road' | 'night' | 'oldies' | 'sport' | 'jazz'
 export type HostId = 'randy' | 'kevin' | 'iris'
 export type Lang = 'zh' | 'en'
 export type Theme = 'dark' | 'retro'
@@ -13,14 +13,16 @@ export interface Preset {
   tagline: string
 }
 
+/** Eight channels, evenly spread over the dial (2.5 MHz apart, give or take a rounding). */
 export const PRESETS: Preset[] = [
-  { id: 'mood', freq: 89.6, name: '随心', tagline: '看时间、看状态，熟悉的和新鲜的搭着放' },
-  { id: 'discover', freq: 92.3, name: '新发现', tagline: '没听过的歌，也许正合你意' },
-  { id: 'focus', freq: 95.1, name: '专注', tagline: '少一点起伏，多一点心流' },
-  { id: 'road', freq: 98.4, name: '在路上', tagline: '窗外的风景，配上合适的节拍' },
-  { id: 'night', freq: 101.7, name: '深夜', tagline: '夜深了，音量放轻，慢慢听' },
-  { id: 'oldies', freq: 104.5, name: '老歌', tagline: '经得起时间的那些旋律' },
-  { id: 'sport', freq: 107.2, name: '运动', tagline: '心率拉起来，节拍跟上' },
+  { id: 'mood', freq: 89.0, name: '随心', tagline: '看时间、看状态，熟悉的和新鲜的搭着放' },
+  { id: 'discover', freq: 91.6, name: '新发现', tagline: '没听过的歌，也许正合你意' },
+  { id: 'focus', freq: 94.1, name: '专注', tagline: '少一点起伏，多一点心流' },
+  { id: 'road', freq: 96.7, name: '在路上', tagline: '窗外的风景，配上合适的节拍' },
+  { id: 'night', freq: 99.3, name: '深夜', tagline: '夜深了，音量放轻，慢慢听' },
+  { id: 'oldies', freq: 101.9, name: '老歌', tagline: '经得起时间的那些旋律' },
+  { id: 'sport', freq: 104.4, name: '运动', tagline: '心率拉起来，节拍跟上' },
+  { id: 'jazz', freq: 107.0, name: '爵士', tagline: '萨克斯、钢琴和一点即兴，慢悠悠的' },
 ]
 
 export interface Host {
@@ -49,6 +51,7 @@ export const HOST_FOR: Record<PresetId, HostId> = {
   night: 'iris',
   oldies: 'randy',
   sport: 'kevin',
+  jazz: 'randy',
 }
 
 /** The tuning dial covers the FM band; on the AM voices the same position reads freq × 10 kHz. */
