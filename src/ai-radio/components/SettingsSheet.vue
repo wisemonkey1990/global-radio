@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { THEMES } from '../data'
-import { diagnostics, playLocalFiles, setAmbience, setMains, setTheme, state } from '../engine'
+import { diagnostics, playLocalFiles, setMains, setTheme, state } from '../engine'
 
 const base = import.meta.env.BASE_URL
 const emit = defineEmits<{ close: [] }>()
@@ -33,7 +33,6 @@ async function copyDiag() {
   }
 }
 
-const pctText = (v: number) => (v === 0 ? '关' : `${Math.round(v * 100)}%`)
 </script>
 
 <template>
@@ -48,14 +47,6 @@ const pctText = (v: number) => (v === 0 ? '关' : `${Math.round(v * 100)}%`)
         <label>主题 <small>外观风格</small></label>
         <div class="seg">
           <button v-for="t in THEMES" :key="t.id" :class="{ on: state.theme === t.id }" @click="setTheme(t.id)">{{ t.label }}</button>
-        </div>
-      </div>
-
-      <div class="field">
-        <label for="amb">电波干扰 <small>底噪 · 静电 · 哼声 · 串台</small></label>
-        <div class="range-row">
-          <input id="amb" type="range" min="0" max="1.5" step="0.05" :value="state.ambience" @input="setAmbience(+($event.target as HTMLInputElement).value)" />
-          <output>{{ pctText(state.ambience) }}</output>
         </div>
       </div>
 

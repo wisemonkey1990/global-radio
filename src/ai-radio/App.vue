@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import FxPanel from './components/FxPanel.vue'
 import ModeKnob from './components/ModeKnob.vue'
 import SettingsSheet from './components/SettingsSheet.vue'
 import SleepFader from './components/SleepFader.vue'
@@ -118,6 +119,9 @@ onBeforeUnmount(() => {
         <p class="mode-desc">{{ currentMode.desc }}</p>
         <ModeKnob :model-value="state.mode" @update:model-value="setMode" />
       </div>
+
+      <h2 class="sec">音效调节<small>在这台收音机的基础上微调</small></h2>
+      <FxPanel />
 
       <h2 class="sec">定时暂停<small>向右拨，到点自动暂停</small></h2>
       <SleepFader :model-value="state.sleepMin" @update:model-value="setSleep" />

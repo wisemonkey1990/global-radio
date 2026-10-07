@@ -29,8 +29,50 @@ import {
 export type RadioMode = 'clean' | 'mw' | 'tube'
 export type RadioVoice = Exclude<RadioMode, 'clean'>
 
+/**
+ * User-adjustable character of the radio, each 0..1 with 0.5 = the profile's own setting.
+ * Tone: bandwidth (top end), lowcut, drive (warm distortion), compression (AGC), box (speaker cabinet).
+ * Air: hiss, crackle (static), hum, interference (whistles + adjacent station), fading (signal swells).
+ */
+export interface RadioFx {
+  bandwidth: number
+  lowcut: number
+  drive: number
+  compression: number
+  box: number
+  hiss: number
+  crackle: number
+  hum: number
+  interference: number
+  fading: number
+}
+
+export const DEFAULT_FX: RadioFx = {
+  bandwidth: 0.5,
+  lowcut: 0.5,
+  drive: 0.5,
+  compression: 0.5,
+  box: 0.5,
+  hiss: 0.5,
+  crackle: 0.5,
+  hum: 0.5,
+  interference: 0.5,
+  fading: 0.5,
+}
+
+/** 0.5 -> x1; each end of the slider spans `span` octaves around that (frequencies, gains). */
+const octave = (v: number, span: number) => 2 ** ((v - 0.5) * span)
+/** Amount of a noise-like source: 0 = off, 0.5 = nominal, 1 = three times as much. */
+const level = (v: number) => (v <= 0.5 ? (2 * v) ** 2 : 1 + (2 * v - 1) * 2)
+/**
+ * Net gain (dB) the compressor gives a typical program (about -20 dB at its input): the static
+ * reduction above the threshold plus the node's automatic make-up gain (-0.6 x the output at 0 dB).
+ */
+const agcGainDb = (threshold: number, ratio: number) => (1 - 1 / ratio) * (0.4 * threshold + 20)
+
 export interface AmRadioOptions {
   mode?: RadioMode
+  fx?: Partial<RadioFx>
   mainsHz?: 50 | 60
   seed?: number
 }
@@ -40,6 +82,8 @@ export interface AmRadio {
   output: AudioNode
   setMode(mode: RadioMode): void
   setMains(hz: 50 | 60): void
+  /** Change the adjustable character of the radio (see RadioFx). */
+  setFx(fx: Partial<RadioFx>): void
   /** 0..1.5 scale for every noise/hum/static source (1 = nominal). */
   setAmbience(amount: number): void
   /** Cheaper processing for when the screen is off (CPU is throttled and the audio thread starves). */
@@ -175,6 +219,7 @@ export function createAmRadio(ctx: BaseAudioContext, options: AmRadioOptions = {
   let mode: RadioMode = options.mode ?? 'mw'
   let mains: 50 | 60 = options.mainsHz ?? 50
   let ambience = 1
+  let fx: RadioFx = { ...DEFAULT_FX, ...options.fx }
 
   const gain = (value = 1) => {
     const g = ctx.createGain()
@@ -385,7 +430,7 @@ export function createAmRadio(ctx: BaseAudioContext, options: AmRadioOptions = {
   function applyAmbience() {
     glide(ambienceBus.gain, ambience, 0.05)
     const hum = mode === 'clean' ? 0 : PROFILES[mode].hum
-    glide(humGain.gain, hum * ambience)
+    glide(humGain.gain, hum * level(fx.hum) * ambience)
   }
 
   /** After the cross-fade has finished, stop processing whatever is no longer audible. */
@@ -413,35 +458,49 @@ export function createAmRadio(ctx: BaseAudioContext, options: AmRadioOptions = {
       return
     }
     const p = PROFILES[mode]
-    glide(txHp.frequency, p.txHp)
-    glide(txLp1.frequency, p.txLp)
-    glide(txLp2.frequency, p.txLp)
-    glide(drive.gain, p.drive)
-    for (const s of ifStages) glide(s.frequency, p.ifLp)
+    // the profile's own numbers, scaled by the user's fx (all neutral at 0.5)
+    const bw = octave(fx.bandwidth, 1.2)
+    const low = octave(fx.lowcut, 1.6)
+    const drv = octave(fx.drive, 2)
+    const ratio = Math.min(20, 1 + (p.agc.ratio - 1) * fx.compression * 2)
+    const box = fx.box * 2
+    const hiss = level(fx.hiss)
+    const crackle = level(fx.crackle)
+    const interference = level(fx.interference)
+    const fading = Math.min(1.8, level(fx.fading))
+    glide(txHp.frequency, p.txHp * low)
+    glide(txLp1.frequency, p.txLp * bw)
+    glide(txLp2.frequency, p.txLp * bw)
+    glide(drive.gain, p.drive * drv)
+    for (const s of ifStages) glide(s.frequency, p.ifLp * bw)
     glide(agc.threshold, p.agc.threshold)
     glide(agc.knee, p.agc.knee)
-    glide(agc.ratio, p.agc.ratio)
+    glide(agc.ratio, ratio)
     glide(agc.attack, p.agc.attack)
     glide(agc.release, p.agc.release)
-    glide(hissGain.gain, p.hiss)
-    glide(fadeToHiss.gain, p.hiss * p.fadeNoise)
-    glide(crackleGain.gain, p.crackle)
-    glide(fadeToCrackle.gain, p.crackle * p.fadeNoise * 1.5)
-    glide(whistleGain.gain, p.whistle)
-    glide(babbleGain.gain, p.babble)
-    glide(powDrive.gain, p.powerDrive)
-    glide(spHp.frequency, p.speaker.hp)
+    glide(hissGain.gain, p.hiss * hiss)
+    glide(fadeToSignal.gain, -0.5 * fading)
+    glide(fadeToHiss.gain, p.hiss * hiss * p.fadeNoise * fading)
+    glide(crackleGain.gain, p.crackle * crackle)
+    glide(fadeToCrackle.gain, p.crackle * crackle * p.fadeNoise * 1.5 * fading)
+    glide(whistleGain.gain, p.whistle * interference)
+    glide(babbleGain.gain, p.babble * interference)
+    glide(powDrive.gain, p.powerDrive * Math.sqrt(drv))
+    glide(spHp.frequency, p.speaker.hp * low)
     glide(spHp.Q, qDb(p.speaker.hpQ))
     p.speaker.peaks.forEach(([f, g, q], i) => {
       glide(spPeaks[i].frequency, f)
-      glide(spPeaks[i].gain, g)
+      glide(spPeaks[i].gain, g * box)
       glide(spPeaks[i].Q, q)
     })
-    glide(spLp.frequency, p.speaker.lp)
+    glide(spLp.frequency, p.speaker.lp * bw)
     glide(spLp.Q, qDb(p.speaker.lpQ))
     glide(combDelay.delayTime, p.speaker.combDelay)
-    glide(combGain.gain, p.speaker.combGain)
-    glide(trim.gain, p.trim)
+    glide(combGain.gain, p.speaker.combGain * box)
+    // keep the loudness where it was when the compressor ratio or the drive change
+    const agcComp = 10 ** ((agcGainDb(p.agc.threshold, p.agc.ratio) - agcGainDb(p.agc.threshold, ratio)) / 20)
+    const driveComp = drv < 1 ? drv ** -1.1 : drv ** -0.8
+    glide(trim.gain, p.trim * agcComp * driveComp)
     for (const v of voices) {
       glide(preSel[v].gain, v === mode ? 1 : 0, 0.02)
       glide(powSel[v].gain, v === mode ? 1 : 0, 0.02)
@@ -501,6 +560,11 @@ export function createAmRadio(ctx: BaseAudioContext, options: AmRadioOptions = {
       if (next === mode) return
       mode = next
       applyMode()
+    },
+    setFx(next) {
+      fx = { ...fx, ...next }
+      if (mode !== 'clean') applyMode()
+      applyAmbience()
     },
     setMains(hz) {
       mains = hz
