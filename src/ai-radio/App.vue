@@ -24,7 +24,7 @@ const mmss = (s: number) => {
 const clock = computed(() => (state.sleepMin ? mmss(state.sleepLeft) : mmss(state.elapsed)))
 
 const status = computed(() => {
-  if (!state.playing) return '轻点右上角 OFF AIR，或直接点一个频道开机'
+  if (!state.playing) return '点一个频道开始收听，再点一下停止'
   if (state.tuning) return '调谐中…'
   if (state.djSpeaking) return `${currentHost.value.name} 正在播报`
   return state.note
@@ -91,6 +91,7 @@ onBeforeUnmount(() => {
     </p>
     <p class="status" :class="{ busy: state.tuning }">{{ status }}</p>
 
+
     <section class="panel">
       <div class="panel-head">
         <span class="cap">PRESETS<small>快捷调频</small></span>
@@ -101,7 +102,7 @@ onBeforeUnmount(() => {
       </div>
       <div class="presets">
         <button v-for="p in PRESETS" :key="p.id" class="key preset" :class="{ active: p.id === state.preset }" @click="tune(p.id)">
-          <small><i v-if="p.id === state.preset" class="led" />{{ dialText(p, state.mode).value }}</small>
+          <small><i v-if="p.id === state.preset && state.playing" class="led" />{{ dialText(p, state.mode).value }}</small>
           <span>{{ p.name }}</span>
         </button>
       </div>
