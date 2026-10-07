@@ -33,33 +33,102 @@ export async function fetchSpeech(ctx: BaseAudioContext, cfg: TtsConfig, text: s
 }
 
 const MALE = /(^|\W)(male|man)\b|yunxi|yunjian|yunyang|yunfeng|kangkang|daniel|alex|fred|david|mark|guy|ryan|aaron|thomas|google uk english male/i
-const FEMALE = /female|woman|xiaoxiao|xiaoyi|xiaohan|tingting|meijia|sinji|samantha|karen|zira|aria|jenny|susan|moira|google us english|google 普通话/i
+const FEMALE = /female|woman|xiaoxiao|xiaoyi|xiaohan|tingting|meijia|sinji|samantha|karen|zira|aria|jenny|susan|moira|huihui|yaoyao|google us english|google 普通话/i
 
-export function pickVoice(lang: Lang, host: Host): SpeechSynthesisVoice | undefined {
-  const prefix = lang === 'zh' ? 'zh' : 'en'
-  const voices = speechSynthesis.getVoices().filter((v) => v.lang.toLowerCase().startsWith(prefix))
-  const byGender = voices.filter((v) => (host.gender === 'f' ? FEMALE : MALE).test(v.name) && !(host.gender === 'm' && FEMALE.test(v.name)))
-  return byGender[0] ?? voices.find((v) => v.default) ?? voices[0]
+const synth = () => ('speechSynthesis' in window ? window.speechSynthesis : null)
+
+/** Voices load asynchronously in some browsers: give them a moment before concluding there are none. */
+async function loadedVoices(): Promise<SpeechSynthesisVoice[]> {
+  const s = synth()
+  if (!s) return []
+  if (s.getVoices().length) return s.getVoices()
+  await new Promise<void>((resolve) => {
+    const t = window.setTimeout(resolve, 1500)
+    s.addEventListener(
+      'voiceschanged',
+      () => {
+        clearTimeout(t)
+        resolve()
+      },
+      { once: true },
+    )
+  })
+  return s.getVoices()
 }
 
 /**
- * Browser speech synthesis. NOTE: the Web Speech API plays straight to the speakers; browsers
- * give no way to route it into Web Audio, so this voice can't pass through the radio filter.
+ * Voices to try, best first. Voices that run on the device come before network ones (Chrome's
+ * "Google …" voices need Google's servers, which fail silently where those are unreachable),
+ * and a gender match breaks ties. The final `null` lets the browser choose by language alone.
  */
-export function speakWithBrowser(text: string, lang: Lang, host: Host): Promise<void> {
+export function voiceCandidates(voices: SpeechSynthesisVoice[], lang: Lang, host: Host): Array<SpeechSynthesisVoice | null> {
+  const prefix = lang === 'zh' ? 'zh' : 'en'
+  const wanted = host.gender === 'f' ? FEMALE : MALE
+  const other = host.gender === 'f' ? MALE : FEMALE
+  const rank = (v: SpeechSynthesisVoice) => (v.localService ? 0 : 2) + (wanted.test(v.name) ? 0 : other.test(v.name) ? 1.5 : 0.5)
+  const ofLang = voices.filter((v) => v.lang.toLowerCase().replace('_', '-').startsWith(prefix)).sort((a, b) => rank(a) - rank(b))
+  return [...ofLang.slice(0, 3), null]
+}
+
+let speechToken = 0
+
+function speakOnce(text: string, lang: Lang, host: Host, voice: SpeechSynthesisVoice | null): Promise<boolean> {
   return new Promise((resolve) => {
-    if (!('speechSynthesis' in window)) return resolve()
+    const s = synth()!
     const u = new SpeechSynthesisUtterance(text)
-    u.lang = lang === 'zh' ? 'zh-CN' : 'en-US'
-    u.voice = pickVoice(lang, host) ?? null
+    u.lang = voice?.lang || (lang === 'zh' ? 'zh-CN' : 'en-US')
+    u.voice = voice
     u.pitch = host.pitch
     u.rate = host.rate
-    u.onend = () => resolve()
-    u.onerror = () => resolve()
-    speechSynthesis.speak(u)
+    // a voice that never starts (offline network voice, no engine) must not hang the broadcast
+    const watchdog = window.setTimeout(() => {
+      s.cancel()
+      resolve(false)
+    }, 5000)
+    u.onstart = () => clearTimeout(watchdog)
+    u.onend = () => {
+      clearTimeout(watchdog)
+      resolve(true)
+    }
+    u.onerror = (e) => {
+      clearTimeout(watchdog)
+      // "canceled"/"interrupted" are our own cancel(): not a failure of the voice
+      resolve(e.error === 'canceled' || e.error === 'interrupted')
+    }
+    s.resume() // a tab that was hidden can leave the synthesiser paused
+    s.speak(u)
   })
 }
 
+/**
+ * Browser speech synthesis, falling back through the available voices. Resolves to false when
+ * nothing could speak. NOTE: the Web Speech API plays straight to the speakers; browsers give no
+ * way to route it into Web Audio, so this voice can't pass through the radio filter.
+ */
+export async function speakWithBrowser(text: string, lang: Lang, host: Host): Promise<boolean> {
+  if (!synth()) return false
+  const token = ++speechToken
+  for (const voice of voiceCandidates(await loadedVoices(), lang, host)) {
+    if (token !== speechToken) return true // cancelled meanwhile
+    try {
+      if (await speakOnce(text, lang, host, voice)) return true
+    } catch {
+      /* this voice can't be used; try the next one */
+    }
+  }
+  return false
+}
+
+/** Safari/iOS only allows the first utterance inside a user gesture: a silent one "unlocks" speech. */
+export function unlockSpeech() {
+  const s = synth()
+  if (!s) return
+  const u = new SpeechSynthesisUtterance(' ')
+  u.volume = 0
+  s.speak(u)
+}
+
 export function cancelBrowserSpeech() {
-  if ('speechSynthesis' in window) speechSynthesis.cancel()
+  speechToken++
+  synth()?.cancel()
 }
