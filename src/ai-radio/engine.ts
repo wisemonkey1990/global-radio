@@ -124,6 +124,7 @@ function ensureAudio() {
   audioEl.addEventListener('ended', () => {
     if (state.source === 'local') nextLocal()
   })
+  document.addEventListener('visibilitychange', onVisibility)
   return ctx
 }
 
@@ -231,6 +232,7 @@ async function startStream(fresh = true) {
           state.station = st.name
           state.note = st.country ? `${st.name} · ${st.country}` : st.name
           rememberStation(preset, st)
+          updateMediaSession(st.name)
           watchStream(token)
           return true
         }
@@ -258,8 +260,9 @@ async function startStream(fresh = true) {
 function watchStream(token: number) {
   const next = () => {
     if (token === streamToken && state.playing && state.source === 'stream') {
+      // a dropped connection: reconnect (the remembered, i.e. current, station is tried first)
       state.tuning = true
-      void startStream(false)
+      void startStream(true)
     }
   }
   audioEl.onerror = next
@@ -269,6 +272,34 @@ function watchStream(token: number) {
     stallTimer = window.setTimeout(next, STALL_TIMEOUT_MS)
   }
   audioEl.onplaying = () => clearTimeout(stallTimer)
+}
+
+/**
+ * Phones suspend or drop media while the page is in the background (and Safari won't start a new
+ * stream from there). Coming back, make sure the audio is really playing, otherwise reconnect.
+ */
+function onVisibility() {
+  if (!state.playing || !ctx) return
+  if (document.hidden) {
+    if (state.djSpeaking) {
+      stopVoice()
+      state.djSpeaking = false
+      state.cueHost = ''
+      duck(false)
+    }
+    return
+  }
+  void ctx.resume()
+  if (state.source === 'local') {
+    if (audioEl.paused) audioEl.play().catch(() => undefined)
+    return
+  }
+  const live = state.source === 'stream' && !audioEl.paused && !audioEl.ended && audioEl.readyState >= 3
+  if (state.tuning || live) return
+  // stalled stream, or the built-in band standing in while we were away: go back to a real station
+  state.tuning = true
+  stopSources()
+  void startStream(true)
 }
 
 function nextLocal() {
@@ -317,9 +348,13 @@ function playBuffer(buf: AudioBuffer) {
 }
 
 async function speak(text: string, h = host()) {
+  // Browsers stall speech synthesis in background tabs and never report its end, which would leave the
+  // music ducked for good. Skip DJ talk while hidden; the next break will come round later.
+  if (document.hidden) return
   state.djSpeaking = true
   duck(true)
-  try {
+  let guard = 0
+  const say = async () => {
     if (ctx && ttsReady(state.tts)) {
       try {
         // routed through the radio chain: the DJ sounds like it comes out of the same set
@@ -330,14 +365,19 @@ async function speak(text: string, h = host()) {
       }
     }
     await speakWithBrowser(text, state.lang, h)
+  }
+  try {
+    // never wait longer than the line can plausibly take
+    await Promise.race([say(), new Promise<void>((resolve) => (guard = window.setTimeout(resolve, 6000 + text.length * 400)))])
   } finally {
+    clearTimeout(guard)
+    stopVoice()
     state.djSpeaking = false
     duck(false)
   }
 }
 
-function silenceDj() {
-  clearTimeout(djTimer)
+function stopVoice() {
   cancelBrowserSpeech()
   try {
     voiceSrc?.stop()
@@ -345,6 +385,11 @@ function silenceDj() {
     /* already stopped */
   }
   voiceSrc = null
+}
+
+function silenceDj() {
+  clearTimeout(djTimer)
+  stopVoice()
   state.djSpeaking = false
   state.cueHost = ''
   if (ctx) musicGain.gain.setTargetAtTime(1, ctx.currentTime, 0.05)
@@ -544,10 +589,14 @@ export const debug = {
   level: getOutputLevel,
 }
 
-function updateMediaSession() {
+function updateMediaSession(station = '') {
   if (!('mediaSession' in navigator)) return
   const p = preset()
-  navigator.mediaSession.metadata = new MediaMetadata({ title: `${p.name} · FM ${p.freq.toFixed(1)}`, artist: 'AI 电台', album: 'AI Radio' })
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: station || `${p.name} · FM ${p.freq.toFixed(1)}`,
+    artist: station ? `${p.name} · AI 电台` : 'AI 电台',
+    album: 'AI Radio',
+  })
   navigator.mediaSession.playbackState = 'playing'
   navigator.mediaSession.setActionHandler('play', () => void play())
   navigator.mediaSession.setActionHandler('pause', () => pause())
