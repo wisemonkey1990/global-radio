@@ -103,6 +103,7 @@ function ensureAudio() {
   ctx = new AC({ latencyHint: 'playback' })
   radio = createAmRadio(ctx, { mode: state.mode, mainsHz: state.mains })
   radio.setAmbience(state.ambience)
+  radio.setEco(document.hidden)
 
   musicGain = ctx.createGain()
   voiceGain = ctx.createGain()
@@ -279,7 +280,9 @@ function watchStream(token: number) {
  * stream from there). Coming back, make sure the audio is really playing, otherwise reconnect.
  */
 function onVisibility() {
-  if (!state.playing || !ctx) return
+  if (!ctx) return
+  radio?.setEco(document.hidden)
+  if (!state.playing) return
   if (document.hidden) {
     if (state.djSpeaking) {
       stopVoice()
