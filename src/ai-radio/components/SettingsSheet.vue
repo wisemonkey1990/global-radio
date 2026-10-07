@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { HOSTS } from '../data'
-import { playLocalFiles, setAmbience, setMains, state } from '../engine'
+import { diagnostics, playLocalFiles, setAmbience, setMains, state } from '../engine'
 import { ttsReady } from '../voice'
 
 const base = import.meta.env.BASE_URL
@@ -15,6 +15,22 @@ async function pick(e: Event) {
   if (list.length) {
     emit('close')
     await playLocalFiles(list)
+  }
+}
+
+const diag = ref('')
+const copied = ref(false)
+function openDiag(e: Event) {
+  if ((e.target as HTMLDetailsElement).open) diag.value = diagnostics()
+}
+async function copyDiag() {
+  diag.value = diagnostics()
+  try {
+    await navigator.clipboard.writeText(diag.value)
+    copied.value = true
+    setTimeout(() => (copied.value = false), 1500)
+  } catch {
+    /* clipboard unavailable: the text is selectable below */
   }
 }
 
@@ -66,6 +82,12 @@ const pctText = (v: number) => (v === 0 ? '关' : `${Math.round(v * 100)}%`)
           <input v-for="h in HOSTS" :key="h.id" v-model.trim="state.tts.voices[h.id]" class="text" type="text" :placeholder="`${h.name}：${h.ttsVoice}`" autocomplete="off" />
         </div>
       </div>
+
+      <details class="diag" @toggle="openDiag">
+        <summary>诊断信息 <small>播放有问题时，把这里的内容发给开发者</small></summary>
+        <pre>{{ diag }}</pre>
+        <button class="wide" @click="copyDiag">{{ copied ? '已复制' : '刷新并复制' }}</button>
+      </details>
 
       <p class="credit">
         网络信号源：精选的 <a href="https://somafm.com" target="_blank" rel="noopener">SomaFM</a> 频道，以及 <a href="https://www.radio-browser.info" target="_blank" rel="noopener">Radio Browser</a> 社区目录里按风格挑出的真实电台（只选支持音效处理的 https 流）。点右上角「换台」可在同一频道里换下一个；全都收不到时切换到内置乐队。<br />

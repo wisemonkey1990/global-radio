@@ -62,6 +62,8 @@ export const state = reactive({
   djSpeaking: false,
   /** short-lived message that takes over the status line */
   alert: '',
+  /** recent audio events, shown in Settings → 诊断信息 to help debug device-specific problems */
+  log: [] as string[],
   cueHost: '' as HostId | '',
 })
 
@@ -93,11 +95,45 @@ let musicGain: GainNode
 let voiceGain: GainNode
 let analyser: AnalyserNode
 let audioEl: HTMLAudioElement
+let keepAlive: HTMLAudioElement
 let house: Generative | null = null
 let voiceSrc: AudioBufferSourceNode | null = null
 let streamToken = 0
 let localQueue: File[] = []
 let localIndex = 0
+
+/**
+ * A second, inaudible <audio> element that is NOT routed through Web Audio. Android browsers give
+ * background priority (a media notification, a foreground service) to pages that are visibly playing
+ * media, and an element whose sound goes into an AudioContext doesn't count. Its content is a
+ * 1-LSB dither, effectively silence but not digital zero, so it isn't treated as muted.
+ */
+function createKeepAlive() {
+  const rate = 8000
+  const samples = rate * 2
+  const buf = new ArrayBuffer(44 + samples * 2)
+  const v = new DataView(buf)
+  const str = (o: number, s: string) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)))
+  str(0, 'RIFF')
+  v.setUint32(4, 36 + samples * 2, true)
+  str(8, 'WAVEfmt ')
+  v.setUint32(16, 16, true)
+  v.setUint16(20, 1, true)
+  v.setUint16(22, 1, true)
+  v.setUint32(24, rate, true)
+  v.setUint32(28, rate * 2, true)
+  v.setUint16(32, 2, true)
+  v.setUint16(34, 16, true)
+  str(36, 'data')
+  v.setUint32(40, samples * 2, true)
+  for (let i = 0; i < samples; i++) v.setInt16(44 + i * 2, Math.random() < 0.5 ? -1 : 1, true)
+  const el = new Audio(URL.createObjectURL(new Blob([buf], { type: 'audio/wav' })))
+  el.loop = true
+  // Not treated as a stop request: browsers also pause media in the background, which must not end the
+  // broadcast. The notification's pause/stop buttons arrive through the Media Session handlers instead.
+  el.addEventListener('pause', () => log('keep-alive paused'))
+  return el
+}
 
 function ensureAudio() {
   if (ctx) return ctx
@@ -125,6 +161,14 @@ function ensureAudio() {
   audioEl.crossOrigin = 'anonymous' // required: Web Audio refuses to process opaque cross-origin media
   audioEl.preload = 'none'
   ctx.createMediaElementSource(audioEl).connect(musicGain)
+  for (const type of ['playing', 'pause', 'waiting', 'stalled', 'error', 'ended', 'emptied']) {
+    audioEl.addEventListener(type, () => {
+      const code = type === 'error' ? ` code=${audioEl.error?.code}` : ''
+      log(`stream ${type}${code} t=${audioEl.currentTime.toFixed(1)} ready=${audioEl.readyState}`)
+    })
+  }
+  ctx.addEventListener('statechange', () => log(`audio context ${ctx?.state}`))
+  keepAlive = createKeepAlive()
   audioEl.addEventListener('playing', () => {
     if (state.source === 'stream' || state.source === 'local') state.tuning = false
   })
@@ -133,6 +177,12 @@ function ensureAudio() {
   })
   document.addEventListener('visibilitychange', onVisibility)
   return ctx
+}
+
+function log(message: string) {
+  const t = new Date().toTimeString().slice(0, 8)
+  state.log.push(`${t} ${document.hidden ? '[后台] ' : ''}${message}`)
+  if (state.log.length > 80) state.log.splice(0, state.log.length - 80)
 }
 
 let alertTimer = 0
@@ -246,6 +296,7 @@ async function startStream(fresh = true) {
           state.station = st.name
           state.note = st.country ? `${st.name} · ${st.country}` : st.name
           rememberStation(preset, st)
+          log(`已连接 ${st.name}`)
           updateMediaSession(st.name)
           watchStream(token)
           return true
@@ -305,6 +356,7 @@ let lastTime = -1
 function beat() {
   if (!state.playing || !ctx || state.tuning) return
   if (ctx.state !== 'running') void ctx.resume()
+  if (keepAlive.paused) keepAlive.play().catch(() => undefined)
   if (state.source !== 'stream' && state.source !== 'local') return
   const stuck = audioEl.paused || audioEl.ended || (audioEl.currentTime === lastTime && audioEl.readyState < 4)
   lastTime = audioEl.currentTime
@@ -313,9 +365,13 @@ function beat() {
     return
   }
   deadTicks++
-  if (audioEl.paused && audioEl.src) audioEl.play().catch(() => undefined)
+  if (audioEl.paused && audioEl.src) {
+    log('心跳：播放被暂停，尝试恢复')
+    audioEl.play().catch((e) => log(`心跳：恢复失败 ${e?.name}`))
+  }
   const limit = document.hidden ? DEAD_BACKGROUND_TICKS : DEAD_FOREGROUND_TICKS
   if (deadTicks >= limit && state.source === 'stream') {
+    log(`心跳：流已停止 ${deadTicks} 次检测，重新连接`)
     deadTicks = 0
     state.tuning = true
     void startStream(true)
@@ -327,6 +383,7 @@ function beat() {
  * stream from there). Coming back, make sure the audio is really playing, otherwise reconnect.
  */
 function onVisibility() {
+  log(document.hidden ? '页面进入后台' : '页面回到前台')
   if (!ctx) return
   radio?.setEco(document.hidden)
   if (!state.playing) return
@@ -487,6 +544,7 @@ export async function play() {
   const resumed = c.resume()
   audioEl.src = SILENT_WAV
   audioEl.play().catch(() => undefined)
+  keepAlive.play().catch((e) => log(`keep-alive play failed: ${e?.name}`))
   await resumed
   if (state.playing) return
   state.playing = true
@@ -513,6 +571,7 @@ function startSource() {
 
 export function pause() {
   if (!state.playing) return
+  keepAlive?.pause()
   state.playing = false
   state.tuning = false
   state.source = ''
@@ -654,8 +713,26 @@ function updateMediaSession(station = '') {
     title: station || `${p.name} · FM ${p.freq.toFixed(1)}`,
     artist: station ? `${p.name} · AI 电台` : 'AI 电台',
     album: 'AI Radio',
+    artwork: ['192x192', '512x512'].map((size) => ({ src: new URL(`${import.meta.env.BASE_URL}icon-${size}.png`, location.href).href, sizes: size, type: 'image/png' })),
   })
   navigator.mediaSession.playbackState = 'playing'
   navigator.mediaSession.setActionHandler('play', () => void play())
   navigator.mediaSession.setActionHandler('pause', () => pause())
+  navigator.mediaSession.setActionHandler('stop', () => pause())
+}
+
+/** Environment + recent events as plain text, for the diagnostics section of the settings sheet. */
+export function diagnostics(): string {
+  const nav = navigator as unknown as { audioSession?: { type: string } }
+  const synth = 'speechSynthesis' in window ? speechSynthesis.getVoices() : null
+  const lines = [
+    `UA: ${navigator.userAgent}`,
+    `安全上下文: ${window.isSecureContext}  可见性: ${document.visibilityState}`,
+    `AudioContext: ${ctx ? `${ctx.state} ${ctx.sampleRate}Hz` : '未创建'}  audioSession: ${nav.audioSession ? nav.audioSession.type : '不支持'}`,
+    `mediaSession: ${'mediaSession' in navigator}  语音合成: ${synth ? `${synth.length} 个声音 (${[...new Set(synth.map((v) => v.lang))].slice(0, 6).join(', ')})` : '不支持'}`,
+    `来源: ${state.source || '-'}  电台: ${state.station || '-'}  播放中: ${state.playing}`,
+    '--- 最近事件 ---',
+    ...state.log,
+  ]
+  return lines.join('\n')
 }
