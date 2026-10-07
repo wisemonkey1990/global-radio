@@ -103,6 +103,10 @@ function ensureAudio() {
   if (ctx) return ctx
   const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
   ctx = new AC({ latencyHint: 'playback' })
+  // Safari 16.4+: treat this page as media playback, so audio keeps going in the background / with the screen
+  // locked and ignores the silent switch (the default session type "auto" lets the system stop Web Audio)
+  const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession
+  if (session) session.type = 'playback'
   radio = createAmRadio(ctx, { mode: state.mode, mainsHz: state.mains })
   radio.setAmbience(state.ambience)
   radio.setEco(document.hidden)
@@ -279,9 +283,43 @@ function watchStream(token: number) {
   audioEl.onended = next
   audioEl.onwaiting = () => {
     clearTimeout(stallTimer)
+    // In the background the browser is merely re-buffering (phones throttle the network); replacing the
+    // element's source there can't be undone on iOS, so leave it to the heartbeat and the foreground check.
+    if (document.hidden) return
     stallTimer = window.setTimeout(next, STALL_TIMEOUT_MS)
   }
   audioEl.onplaying = () => clearTimeout(stallTimer)
+}
+
+// ------------------------------------------------------------------ heartbeat
+// While on air, every few seconds make sure the media element really is playing. The OS can pause it
+// (audio focus, lock screen) without telling the page; resuming the same element is allowed where
+// starting a new stream is not. A stream that is truly dead is reconnected, later when in the background.
+const HEARTBEAT_MS = 4000
+const DEAD_FOREGROUND_TICKS = 4
+const DEAD_BACKGROUND_TICKS = 15
+let heartbeat = 0
+let deadTicks = 0
+let lastTime = -1
+
+function beat() {
+  if (!state.playing || !ctx || state.tuning) return
+  if (ctx.state !== 'running') void ctx.resume()
+  if (state.source !== 'stream' && state.source !== 'local') return
+  const stuck = audioEl.paused || audioEl.ended || (audioEl.currentTime === lastTime && audioEl.readyState < 4)
+  lastTime = audioEl.currentTime
+  if (!stuck) {
+    deadTicks = 0
+    return
+  }
+  deadTicks++
+  if (audioEl.paused && audioEl.src) audioEl.play().catch(() => undefined)
+  const limit = document.hidden ? DEAD_BACKGROUND_TICKS : DEAD_FOREGROUND_TICKS
+  if (deadTicks >= limit && state.source === 'stream') {
+    deadTicks = 0
+    state.tuning = true
+    void startStream(true)
+  }
 }
 
 /**
@@ -457,6 +495,9 @@ export async function play() {
   state.elapsed = 0
   clearInterval(clock)
   clock = window.setInterval(tickClock, 250)
+  clearInterval(heartbeat)
+  deadTicks = 0
+  heartbeat = window.setInterval(beat, HEARTBEAT_MS)
   musicGain.gain.cancelScheduledValues(c.currentTime)
   musicGain.gain.setValueAtTime(1, c.currentTime)
   startSource()
@@ -476,6 +517,7 @@ export function pause() {
   state.tuning = false
   state.source = ''
   clearInterval(clock)
+  clearInterval(heartbeat)
   sleepEnd = 0
   state.sleepMin = 0
   state.sleepLeft = 0
