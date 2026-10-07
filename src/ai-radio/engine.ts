@@ -6,11 +6,15 @@ import { createAmRadio, type AmRadio, type RadioMode } from './audio/amRadio'
 import { startGenerative, type Generative } from './audio/generative'
 import { HOSTS, PRESETS, SLEEP_STEPS, type HostId, type Lang, type PresetId } from './data'
 import { cueLine, djLine } from './dj'
+import { CURATED, lastStation, loadDirectory, probeStream, rememberStation, type Station } from './stations'
 import { cancelBrowserSpeech, emptyTts, fetchSpeech, speakWithBrowser, ttsReady, type TtsConfig } from './voice'
 
 const STORE_KEY = 'ai-radio:v1'
-const ICE_MIRRORS = ['ice1', 'ice2', 'ice4']
 const STREAM_TIMEOUT_MS = 9000
+const PROBE_TIMEOUT_MS = 4000
+const PROBE_BATCH = 4
+const STALL_TIMEOUT_MS = 12000
+const MAX_ATTEMPTS = 10
 const DUCK_LEVEL = 0.25
 
 interface Saved {
@@ -47,6 +51,8 @@ export const state = reactive({
   /** true from tuning until the first sound of the new station arrives */
   tuning: false,
   source: '' as '' | 'stream' | 'house' | 'local',
+  /** name of the station currently on the air (stream source) */
+  station: '',
   note: '',
   /** 1..5 bars */
   signal: 5,
@@ -88,7 +94,6 @@ let audioEl: HTMLAudioElement
 let house: Generative | null = null
 let voiceSrc: AudioBufferSourceNode | null = null
 let streamToken = 0
-let streamTimer = 0
 let localQueue: File[] = []
 let localIndex = 0
 
@@ -128,8 +133,9 @@ const host = (id: HostId | '' = state.host) => HOSTS.find((h) => h.id === id) ??
 // ------------------------------------------------------------------ sources
 function stopSources() {
   streamToken++
-  clearTimeout(streamTimer)
+  clearTimeout(stallTimer)
   if (audioEl) {
+    audioEl.onerror = audioEl.onended = audioEl.onwaiting = audioEl.onplaying = null
     audioEl.pause()
     audioEl.removeAttribute('src')
     audioEl.load()
@@ -142,43 +148,117 @@ function startHouse() {
   if (!ctx) return
   house = startGenerative(ctx, musicGain, state.preset)
   state.source = 'house'
+  state.station = ''
   state.tuning = false
-  state.note = '内置乐队 · 离线演奏（网络电台暂时收不到）'
+  state.note = '暂时收不到网络电台，先由内置乐队演奏 · 点「换台」重试'
 }
 
-/** Try the stream mirrors for this preset in turn; fall back to the built-in band. */
-function startStream() {
-  const token = ++streamToken
-  const p = preset()
-  const urls: Array<{ url: string; name: string }> = []
-  p.stations.forEach((s, i) => {
-    for (const mirror of i === 0 ? ICE_MIRRORS : ICE_MIRRORS.slice(0, 1)) {
-      urls.push({ url: `https://${mirror}.somafm.com/${s.id}-128-mp3`, name: s.name })
-    }
-  })
+// Stations already tried (played or failed) per preset, so "next station" keeps moving through the pool.
+const seen = new Map<PresetId, Set<string>>()
+let stallTimer = 0
 
-  const attempt = (i: number) => {
-    if (token !== streamToken) return
-    clearTimeout(streamTimer)
-    if (i >= urls.length) return startHouse()
-    const { url, name } = urls[i]
-    state.source = 'stream'
-    state.note = `信号源 SomaFM · ${name}`
-    const fail = () => {
-      if (token !== streamToken) return
-      audioEl.onerror = null
-      attempt(i + 1)
+function playUrl(url: string, token: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    let timer = 0
+    const finish = (ok: boolean) => {
+      clearTimeout(timer)
+      audioEl.removeEventListener('playing', onPlaying)
+      audioEl.removeEventListener('error', onError)
+      resolve(ok)
     }
-    audioEl.onerror = fail
-    streamTimer = window.setTimeout(() => {
-      if (audioEl.paused || audioEl.readyState < 3) fail()
-    }, STREAM_TIMEOUT_MS)
+    const onPlaying = () => finish(true)
+    const onError = () => finish(false)
+    audioEl.addEventListener('playing', onPlaying)
+    audioEl.addEventListener('error', onError)
+    timer = window.setTimeout(() => finish(false), STREAM_TIMEOUT_MS)
+    if (token !== streamToken) return finish(false)
     audioEl.src = url
-    audioEl.play().catch(() => {
-      /* autoplay refusal is surfaced by the pill state; real network errors arrive via onerror */
-    })
+    audioEl.play().catch(() => finish(false))
+  })
+}
+
+/** First URL of a station that answers a CORS request; mirrors are probed in parallel. */
+async function reachableUrl(st: Station): Promise<string | undefined> {
+  const urls = st.urls.slice(0, 3)
+  const ok = await Promise.all(urls.map((u) => probeStream(u, PROBE_TIMEOUT_MS)))
+  return urls[ok.indexOf(true)]
+}
+
+/**
+ * Find a real station for the current preset: the last one that worked, then the curated
+ * SomaFM channels, then the Radio Browser directory. Candidates are probed a few at a time
+ * (so dead or CORS-less servers cost one timeout, not one each) and played in order.
+ * Falls back to the built-in band when nothing works.
+ */
+async function startStream(fresh = true) {
+  const token = ++streamToken
+  const preset = state.preset
+  const tried = seen.get(preset) ?? new Set<string>()
+  seen.set(preset, tried)
+  if (fresh) tried.clear() // re-tuning starts from the best known station again
+  state.source = 'stream'
+  state.station = ''
+  state.note = '正在搜索电台…'
+
+  const last = lastStation(preset)
+  const candidates = (...lists: Station[][]) => {
+    const unique = new Map([...lists.flat()].map((s) => [s.urls[0], s]))
+    return [...unique.values()].filter((s) => !tried.has(s.urls[0]))
   }
-  attempt(0)
+
+  let attempts = 0
+  const run = async (list: Station[]) => {
+    for (let i = 0; i < list.length; i += PROBE_BATCH) {
+      if (token !== streamToken || attempts >= MAX_ATTEMPTS) return false
+      const batch = list.slice(i, i + PROBE_BATCH)
+      state.note = `正在连接 ${batch[0].name}…`
+      const urls = await Promise.all(batch.map(reachableUrl))
+      for (let k = 0; k < batch.length; k++) {
+        if (token !== streamToken) return false
+        const st = batch[k]
+        tried.add(st.urls[0])
+        if (!urls[k] || attempts >= MAX_ATTEMPTS) continue
+        attempts++
+        state.note = `正在连接 ${st.name}…`
+        if (await playUrl(urls[k]!, token)) {
+          if (token !== streamToken) return false
+          state.station = st.name
+          state.note = st.country ? `${st.name} · ${st.country}` : st.name
+          rememberStation(preset, st)
+          watchStream(token)
+          return true
+        }
+      }
+    }
+    return false
+  }
+
+  if (await run(candidates(last ? [last] : [], CURATED[preset]))) return
+  if (token !== streamToken) return
+  const directory = await loadDirectory(preset, state.lang)
+  if (token !== streamToken) return
+  if (await run(candidates(directory))) return
+  if (token !== streamToken) return
+  // pool exhausted or unreachable: start over next time, and keep the music going meanwhile
+  tried.clear()
+  startHouse()
+}
+
+/** Once a stream is playing: a dropped or stalled connection moves on to another station. */
+function watchStream(token: number) {
+  const next = () => {
+    if (token === streamToken && state.playing && state.source === 'stream') {
+      state.tuning = true
+      void startStream(false)
+    }
+  }
+  audioEl.onerror = next
+  audioEl.onended = next
+  audioEl.onwaiting = () => {
+    clearTimeout(stallTimer)
+    stallTimer = window.setTimeout(next, STALL_TIMEOUT_MS)
+  }
+  audioEl.onplaying = () => clearTimeout(stallTimer)
 }
 
 function nextLocal() {
@@ -308,7 +388,7 @@ export async function play() {
 function startSource() {
   radio?.tuneSweep()
   if (localQueue.length) playLocalAt(localIndex)
-  else startStream()
+  else void startStream()
 }
 
 export function pause() {
@@ -342,7 +422,7 @@ export async function tune(id: PresetId) {
   localQueue = []
   localIndex = 0
   if (!state.playing) return play()
-  if (!changed && state.source !== 'local') return
+  if (!changed && state.source !== 'local') return nextStation()
   state.tuning = true
   clearTimeout(djTimer)
   cancelBrowserSpeech()
@@ -350,6 +430,18 @@ export async function tune(id: PresetId) {
   startSource()
   scheduleDj(5)
   updateMediaSession()
+}
+
+/** Dial on to another station of the current preset. */
+export function nextStation() {
+  if (!state.playing || state.source === 'local') return
+  state.tuning = true
+  clearTimeout(djTimer)
+  cancelBrowserSpeech()
+  stopSources()
+  radio?.tuneSweep()
+  void startStream(false)
+  scheduleDj(6)
 }
 
 export function setHost(id: HostId) {
