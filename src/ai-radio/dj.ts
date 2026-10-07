@@ -23,6 +23,7 @@ const ZH = {
     night: ['音量调小一点，今晚我陪你。', '这个时间的歌，适合安静地听。'],
     oldies: ['有些老歌，一响起来就回到了从前。', '经得起时间的旋律，接着放。'],
     sport: ['心率拉起来，节拍跟上。', '再坚持一组，下一首更带劲。'],
+    jazz: ['萨克斯和钢琴，不着急，跟着节奏轻轻晃。', '来一段即兴，像一杯慢慢喝的酒。'],
   } as Record<PresetId, string[]>,
   sign: { randy: '我是 Randy，慢慢来。', kevin: '我是 Kevin，继续往下听。', iris: '我是 Iris，待会儿见。' },
   station: (p: Preset) => `这里是调频 ${p.freq.toFixed(1)}，${p.name}电台。`,
@@ -46,6 +47,7 @@ const EN = {
     night: ['Turn it down a little, I’m here with you tonight.', 'These are songs for listening quietly.'],
     oldies: ['Some old songs take you straight back.', 'Melodies that stand the test of time, coming up.'],
     sport: ['Get that heart rate up, keep with the beat.', 'One more set, the next track hits harder.'],
+    jazz: ['Saxophone and piano, no hurry, just sway along.', 'A little improvisation, like a drink to sip slowly.'],
   } as Record<PresetId, string[]>,
   sign: { randy: 'I’m Randy. Take it slow.', kevin: 'I’m Kevin. Stay tuned.', iris: 'I’m Iris. See you in a bit.' },
   station: (p: Preset) => `This is FM ${p.freq.toFixed(1)}, ${EN_NAMES[p.id]} radio.`,
@@ -59,6 +61,7 @@ const EN_NAMES: Record<PresetId, string> = {
   night: 'Late Night',
   oldies: 'Golden Oldies',
   sport: 'Workout',
+  jazz: 'Jazz',
 }
 
 const pick = <T>(list: T[]) => list[Math.floor(Math.random() * list.length)]

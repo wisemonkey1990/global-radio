@@ -41,7 +41,10 @@ const saved = load()
 function initialFreq() {
   const preset = PRESETS.find((p) => p.id === saved.preset) ?? PRESETS[0]
   const f = saved.freq
-  return typeof f === 'number' && f >= FREQ_MIN && f <= FREQ_MAX ? Math.round(f * 10) / 10 : preset.freq
+  if (typeof f !== 'number' || f < FREQ_MIN || f > FREQ_MAX) return preset.freq
+  // channels were re-spaced when the eighth was added: a saved dial position that isn't on any channel
+  // any more starts on the saved channel instead of between stations
+  return PRESETS.some((p) => Math.abs(p.freq - f) <= LOCK_WINDOW) ? Math.round(f * 10) / 10 : preset.freq
 }
 
 export const state = reactive({

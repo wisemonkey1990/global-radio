@@ -36,9 +36,10 @@ export const CURATED: Record<PresetId, Station[]> = {
   discover: [soma('indiepop', 'Indie Pop Rocks!'), soma('folkfwd', 'Folk Forward')],
   focus: [soma('dronezone', 'Drone Zone'), soma('deepspaceone', 'Deep Space One')],
   road: [soma('seventies', 'Left Coast 70s'), soma('u80s', 'Underground 80s')],
-  night: [soma('lush', 'Lush'), soma('sonicuniverse', 'Sonic Universe')],
-  oldies: [soma('7soul', 'Seven Inch Soul'), soma('illstreet', 'Illinois Street Lounge')],
+  night: [soma('lush', 'Lush'), soma('spacestation', 'Space Station Soma')],
+  oldies: [soma('7soul', 'Seven Inch Soul'), soma('insound', 'The In-Sound')],
   sport: [soma('poptron', 'PopTron'), soma('beatblender', 'Beat Blender')],
+  jazz: [soma('sonicuniverse', 'Sonic Universe'), soma('illstreet', 'Illinois Street Lounge')],
 }
 
 /**
@@ -58,9 +59,10 @@ const CURATED_CN: Record<PresetId, Station[]> = {
   discover: [qt(1671, '济南音乐广播'), qt(15318146, '杭州潮流音乐电台'), qt(4938, '江苏经典流行音乐广播'), qt(1110, '四川音乐广播')],
   focus: [qt(267, '上海经典音乐广播'), direct('https://radio.chinesemusicworld.com/chinesemusic.mp3', 'Chinese Classical Music')],
   road: [qt(1260, '广东音乐之声'), qt(1947, '安徽音乐广播'), qt(15318294, '宁夏音乐广播'), qt(1683, '烟台音乐广播')],
-  night: [direct('https://radio.nitro-server.uk/listen/1940sshanghaioldtimesmusicradio/radio.mp3', '上海麗都廣播電台 · 1940s'), qt(267, '上海经典音乐广播')],
+  night: [direct('https://az1.mediacp.eu/listen/airport-lounge-radio/radio.mp3', '休息音乐 · Airport Lounge', ''), qt(267, '上海经典音乐广播')],
   oldies: [qt(5022308, '500首华语经典'), qt(1296, '湖北经典音乐广播'), qt(1223, '郑州经典音乐广播'), qt(4885, '陕西青少广播 好听1055')],
   sport: [qt(15318146, '杭州潮流音乐电台'), qt(5022379, '星空电台 STAR RADIO'), direct('https://antares.dribbcast.com/proxy/apop?mp=/s', 'Big B Radio 亚洲音乐台')],
+  jazz: [direct('https://radio.nitro-server.uk/listen/1940sshanghaioldtimesmusicradio/radio.mp3', '上海麗都廣播電台 · 1940s'), direct('https://az1.mediacp.eu/listen/airport-lounge-radio/radio.mp3', '休息音乐 · Airport Lounge', '')],
 }
 
 /** Stations known to work without the directory: Chinese ones first for Chinese users, then SomaFM. */
@@ -76,9 +78,10 @@ const GLOBAL_QUERIES: Record<PresetId, Query[]> = {
   discover: [{ tag: 'indie' }, { tag: 'alternative' }, { tag: 'new music' }],
   focus: [{ tag: 'ambient' }, { tag: 'piano' }, { tag: 'classical' }],
   road: [{ tag: 'classic rock' }, { tag: 'rock' }, { tag: 'pop' }],
-  night: [{ tag: 'jazz' }, { tag: 'smooth jazz' }, { tag: 'downtempo' }],
+  night: [{ tag: 'relaxation' }, { tag: 'sleep' }, { tag: 'downtempo' }],
   oldies: [{ tag: 'oldies' }, { tag: '60s' }, { tag: '70s' }],
   sport: [{ tag: 'dance' }, { tag: 'electronic' }, { tag: 'edm' }],
+  jazz: [{ tag: 'jazz' }, { tag: 'smooth jazz' }, { tag: 'bebop' }],
 }
 
 /** Chinese-language music stations, mixed in when the DJ language is Chinese. */

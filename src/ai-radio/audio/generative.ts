@@ -56,6 +56,10 @@ const STYLES: Record<PresetId, Style> = {
     bpm: 76, stepsPerBar: 12, drums: 'triplet', compKind: 'epiano', comp: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], bass: [0, 6],
     chords: [{ root: 53, q: MAJ }, { root: 50, q: MIN }, { root: 46, q: MAJ }, { root: 48, q: MAJ }],
   },
+  jazz: {
+    bpm: 104, swing: 0.28, stepsPerBar: 16, drums: 'brush', compKind: 'epiano', comp: [0, 6, 10], bass: [0, 4, 8, 12],
+    chords: [{ root: 53, q: MAJ9 }, { root: 50, q: MIN9 }, { root: 43, q: MIN9 }, { root: 48, q: DOM9 }],
+  },
   sport: {
     bpm: 128, stepsPerBar: 16, drums: 'four', compKind: 'saw', comp: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], arp: true, bass: [0, 2, 4, 6, 8, 10, 12, 14],
     chords: [{ root: 57, q: MIN7 }, { root: 53, q: MAJ }, { root: 48, q: MAJ }, { root: 55, q: MAJ }],
