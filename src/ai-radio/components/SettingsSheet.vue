@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { THEMES } from '../data'
+import FxPanel from './FxPanel.vue'
 import { diagnostics, playLocalFiles, setMains, setTheme, state } from '../engine'
 
 const base = import.meta.env.BASE_URL
@@ -48,6 +49,11 @@ async function copyDiag() {
         <div class="seg">
           <button v-for="t in THEMES" :key="t.id" :class="{ on: state.theme === t.id }" @click="setTheme(t.id)">{{ t.label }}</button>
         </div>
+      </div>
+
+      <div class="field">
+        <label>音效调节 <small>在这台收音机的基础上微调</small></label>
+        <FxPanel />
       </div>
 
       <div class="field">
