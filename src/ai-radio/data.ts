@@ -1,7 +1,6 @@
 import type { RadioMode } from './audio/amRadio'
 
 export type PresetId = 'mood' | 'discover' | 'focus' | 'road' | 'night' | 'oldies' | 'sport' | 'jazz'
-export type HostId = 'randy' | 'kevin' | 'iris'
 export type Lang = 'zh' | 'en'
 export type Theme = 'dark' | 'retro'
 
@@ -25,34 +24,7 @@ export const PRESETS: Preset[] = [
   { id: 'jazz', freq: 107.0, name: '爵士', tagline: '萨克斯、钢琴和一点即兴，慢悠悠的' },
 ]
 
-export interface Host {
-  id: HostId
-  name: string
-  /** Web Speech fallback tuning */
-  gender: 'm' | 'f'
-  pitch: number
-  rate: number
-  /** default voice name for OpenAI-compatible /audio/speech endpoints */
-  ttsVoice: string
-}
 
-export const HOSTS: Host[] = [
-  { id: 'randy', name: 'Randy', gender: 'm', pitch: 0.75, rate: 0.92, ttsVoice: 'onyx' },
-  { id: 'kevin', name: 'Kevin', gender: 'm', pitch: 1, rate: 1.05, ttsVoice: 'echo' },
-  { id: 'iris', name: 'Iris', gender: 'f', pitch: 1.05, rate: 0.95, ttsVoice: 'nova' },
-]
-
-/** Each channel has its own DJ (the host is no longer picked by hand). */
-export const HOST_FOR: Record<PresetId, HostId> = {
-  mood: 'randy',
-  discover: 'kevin',
-  focus: 'iris',
-  road: 'kevin',
-  night: 'iris',
-  oldies: 'randy',
-  sport: 'kevin',
-  jazz: 'randy',
-}
 
 /** The tuning dial covers the FM band; on the AM voices the same position reads freq × 10 kHz. */
 export const FREQ_MIN = 87.5

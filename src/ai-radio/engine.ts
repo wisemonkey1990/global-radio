@@ -1,13 +1,11 @@
 // Radio engine: owns the AudioContext, the radio chain, the stream / house-band / local
-// sources, DJ breaks, sleep timer, and the reactive state the UI renders.
+// sources, sleep timer, and the reactive state the UI renders.
 
 import { reactive, watch } from 'vue'
 import { createAmRadio, type AmRadio, type RadioMode } from './audio/amRadio'
 import { startGenerative, type Generative } from './audio/generative'
-import { FREQ_MAX, FREQ_MIN, HOSTS, HOST_FOR, LOCK_WINDOW, PRESETS, SLEEP_STEPS, THEMES, type Lang, type PresetId, type Theme } from './data'
-import { djLine } from './dj'
+import { FREQ_MAX, FREQ_MIN, LOCK_WINDOW, PRESETS, SLEEP_STEPS, THEMES, type Lang, type PresetId, type Theme } from './data'
 import { curatedFor, lastStation, loadDirectory, probeStream, rememberStation, type Station } from './stations'
-import { cancelBrowserSpeech, emptyTts, fetchSpeech, speakWithBrowser, ttsReady, unlockSpeech, type TtsConfig } from './voice'
 
 const STORE_KEY = 'ai-radio:v1'
 const STREAM_TIMEOUT_MS = 9000
@@ -15,7 +13,6 @@ const PROBE_TIMEOUT_MS = 4000
 const PROBE_BATCH = 4
 const STALL_TIMEOUT_MS = 12000
 const MAX_ATTEMPTS = 10
-const DUCK_LEVEL = 0.25
 
 interface Saved {
   preset: PresetId
@@ -24,7 +21,6 @@ interface Saved {
   lang: Lang
   mains: 50 | 60
   ambience: number
-  tts: TtsConfig
   theme: Theme
 }
 
@@ -56,7 +52,6 @@ export const state = reactive({
   mains: (saved.mains === 60 ? 60 : 50) as 50 | 60,
   /** 0..1.5, scales hiss / static / hum / interference */
   ambience: typeof saved.ambience === 'number' ? saved.ambience : 1,
-  tts: { ...emptyTts(), ...saved.tts } as TtsConfig,
   theme: (THEMES.some((t) => t.id === saved.theme) ? saved.theme : 'dark') as Theme,
 
   playing: false,
@@ -72,9 +67,6 @@ export const state = reactive({
   elapsed: 0,
   sleepMin: 0,
   sleepLeft: 0,
-  djSpeaking: false,
-  /** short-lived message that takes over the status line */
-  alert: '',
   /** recent audio events, shown in Settings → 诊断信息 to help debug device-specific problems */
   log: [] as string[],
 })
@@ -89,7 +81,7 @@ export const state = reactive({
 }
 
 watch(
-  () => [state.preset, state.freq, state.mode, state.lang, state.mains, state.ambience, state.tts, state.theme],
+  () => [state.preset, state.freq, state.mode, state.lang, state.mains, state.ambience, state.theme],
   () => {
     const out: Saved = {
       preset: state.preset,
@@ -98,7 +90,6 @@ watch(
       lang: state.lang,
       mains: state.mains,
       ambience: state.ambience,
-      tts: state.tts,
       theme: state.theme,
     }
     try {
@@ -127,12 +118,10 @@ export function setTheme(theme: Theme) {
 let ctx: AudioContext | null = null
 let radio: AmRadio | null = null
 let musicGain: GainNode
-let voiceGain: GainNode
 let analyser: AnalyserNode
 let audioEl: HTMLAudioElement
 let keepAlive: HTMLAudioElement
 let house: Generative | null = null
-let voiceSrc: AudioBufferSourceNode | null = null
 let streamToken = 0
 let localQueue: File[] = []
 let localIndex = 0
@@ -198,9 +187,7 @@ function ensureAudio() {
   radio.setEco(document.hidden)
 
   musicGain = ctx.createGain()
-  voiceGain = ctx.createGain()
   musicGain.connect(radio.input)
-  voiceGain.connect(radio.input)
 
   analyser = ctx.createAnalyser()
   analyser.fftSize = 2048
@@ -236,15 +223,7 @@ function log(message: string) {
   if (state.log.length > 120) state.log.splice(0, state.log.length - 120)
 }
 
-let alertTimer = 0
-function flash(message: string) {
-  state.alert = message
-  clearTimeout(alertTimer)
-  alertTimer = window.setTimeout(() => (state.alert = ''), 9000)
-}
-
 const preset = () => PRESETS.find((p) => p.id === state.preset) ?? PRESETS[0]
-const host = () => HOSTS.find((h) => h.id === HOST_FOR[state.preset]) ?? HOSTS[0]
 
 // ------------------------------------------------------------------ sources
 function stopSources() {
@@ -445,11 +424,6 @@ function onVisibility() {
   radio?.setEco(document.hidden)
   if (!state.playing) return
   if (document.hidden) {
-    if (state.djSpeaking) {
-      stopVoice()
-      state.djSpeaking = false
-      duck(false)
-    }
     return
   }
   void ctx.resume()
@@ -478,88 +452,6 @@ function playLocalAt(i: number) {
   audioEl.play().catch(() => undefined)
   state.source = 'local'
   state.note = `本地音乐 · ${f.name}`
-}
-
-// ------------------------------------------------------------------ DJ
-let djTimer = 0
-
-function scheduleDj(seconds: number) {
-  clearTimeout(djTimer)
-  djTimer = window.setTimeout(async () => {
-    if (!state.playing) return
-    if (state.tuning) return scheduleDj(3) // let the station come in first
-    if (state.source === 'static') return scheduleDj(20) // nobody to talk over
-    await speak(djLine(state.lang, preset(), host()), host())
-    scheduleDj(240 + Math.random() * 120)
-  }, seconds * 1000)
-}
-
-function duck(on: boolean) {
-  if (!ctx) return
-  musicGain.gain.setTargetAtTime(on ? DUCK_LEVEL : 1, ctx.currentTime, on ? 0.2 : 0.8)
-}
-
-function playBuffer(buf: AudioBuffer) {
-  return new Promise<void>((resolve) => {
-    const src = ctx!.createBufferSource()
-    src.buffer = buf
-    src.connect(voiceGain)
-    src.onended = () => {
-      if (voiceSrc === src) voiceSrc = null
-      resolve()
-    }
-    voiceSrc = src
-    src.start()
-  })
-}
-
-async function speak(text: string, h = host()) {
-  // Browsers stall speech synthesis in background tabs and never report its end, which would leave the
-  // music ducked for good. Skip DJ talk while hidden; the next break will come round later.
-  if (document.hidden) return
-  state.djSpeaking = true
-  duck(true)
-  let guard = 0
-  const say = async () => {
-    if (ctx && ttsReady(state.tts)) {
-      try {
-        // routed through the radio chain: the DJ sounds like it comes out of the same set
-        await playBuffer(await fetchSpeech(ctx, state.tts, text, h))
-        return
-      } catch {
-        state.note = '外部语音接口出错，改用浏览器语音（这种语音不会经过收音机滤波）'
-      }
-    }
-    if (!(await speakWithBrowser(text, state.lang, h))) {
-      flash('DJ 语音不可用：这个浏览器/设备没有能用的语音合成。可在设置里接入语音接口')
-    }
-  }
-  try {
-    // never wait longer than the line can plausibly take
-    await Promise.race([say(), new Promise<void>((resolve) => (guard = window.setTimeout(resolve, 6000 + text.length * 400)))])
-  } finally {
-    clearTimeout(guard)
-    stopVoice()
-    state.djSpeaking = false
-    duck(false)
-  }
-}
-
-function stopVoice() {
-  cancelBrowserSpeech()
-  try {
-    voiceSrc?.stop()
-  } catch {
-    /* already stopped */
-  }
-  voiceSrc = null
-}
-
-function silenceDj() {
-  clearTimeout(djTimer)
-  stopVoice()
-  state.djSpeaking = false
-  if (ctx) musicGain.gain.setTargetAtTime(1, ctx.currentTime, 0.05)
 }
 
 // ------------------------------------------------------------------ clocks (elapsed, sleep, signal bars)
@@ -597,7 +489,6 @@ const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAI
 export async function play() {
   if (state.playing) return
   const c = ensureAudio()
-  unlockSpeech()
   const resumed = c.resume()
   audioEl.src = SILENT_WAV
   audioEl.play().catch(() => undefined)
@@ -617,7 +508,6 @@ export async function play() {
   musicGain.gain.cancelScheduledValues(c.currentTime)
   musicGain.gain.setValueAtTime(1, c.currentTime)
   startSource()
-  scheduleDj(6)
   updateMediaSession()
 }
 
@@ -651,7 +541,6 @@ export function pause() {
   sleepEnd = 0
   state.sleepMin = 0
   state.sleepLeft = 0
-  silenceDj()
   stopSources()
   state.note = ''
   if (ctx) {
@@ -681,11 +570,8 @@ export async function tune(id: PresetId) {
   // tapping the channel that is on the air again stops it
   if (sameChannel && state.source !== 'local' && state.source !== 'static') return pause()
   state.tuning = true
-  clearTimeout(djTimer)
-  cancelBrowserSpeech()
   stopSources()
   startSource()
-  scheduleDj(5)
   updateMediaSession()
 }
 
@@ -693,12 +579,9 @@ export async function tune(id: PresetId) {
 export function nextStation() {
   if (!state.playing || state.source === 'local' || state.source === 'static') return
   state.tuning = true
-  clearTimeout(djTimer)
-  cancelBrowserSpeech()
   stopSources()
   radio?.tuneSweep()
   void startStream(false)
-  scheduleDj(6)
 }
 
 let settleTimer = 0
@@ -727,15 +610,10 @@ function settle() {
     localQueue = []
     localIndex = 0
     state.tuning = true
-    clearTimeout(djTimer)
-    cancelBrowserSpeech()
     stopSources()
     startSource()
-    scheduleDj(5)
     updateMediaSession()
   } else if (state.source !== 'local' && state.source !== 'static') {
-    clearTimeout(djTimer)
-    cancelBrowserSpeech()
     stopSources()
     radio?.tuneSweep()
     goStatic()
@@ -775,11 +653,9 @@ export async function playLocalFiles(files: File[]) {
   localQueue = list
   localIndex = 0
   if (state.playing) {
-    clearTimeout(djTimer)
     stopSources()
     state.tuning = true
     startSource()
-    scheduleDj(30)
   } else {
     await play()
   }
@@ -823,12 +699,11 @@ function updateMediaSession(station = '') {
 /** Environment + recent events as plain text, for the diagnostics section of the settings sheet. */
 export function diagnostics(): string {
   const nav = navigator as unknown as { audioSession?: { type: string } }
-  const synth = 'speechSynthesis' in window ? speechSynthesis.getVoices() : null
   const lines = [
     `UA: ${navigator.userAgent}`,
     `安全上下文: ${window.isSecureContext}  可见性: ${document.visibilityState}`,
     `AudioContext: ${ctx ? `${ctx.state} ${ctx.sampleRate}Hz` : '未创建'}  audioSession: ${nav.audioSession ? nav.audioSession.type : '不支持'}`,
-    `mediaSession: ${'mediaSession' in navigator}  语音合成: ${synth ? `${synth.length} 个声音 (${[...new Set(synth.map((v) => v.lang))].slice(0, 6).join(', ')})` : '不支持'}`,
+    `mediaSession: ${'mediaSession' in navigator}`,
     `网络: ${navigator.onLine ? 'online' : 'offline'} ${(navigator as unknown as { connection?: { type?: string; effectiveType?: string } }).connection?.type ?? ''} ${(navigator as unknown as { connection?: { effectiveType?: string } }).connection?.effectiveType ?? ''}`,
     `来源: ${state.source || '-'}  电台: ${state.station || '-'}  播放中: ${state.playing}`,
     '--- 最近事件 ---',

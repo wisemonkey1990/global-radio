@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { HOSTS, THEMES } from '../data'
+import { THEMES } from '../data'
 import { diagnostics, playLocalFiles, setAmbience, setMains, setTheme, state } from '../engine'
-import { ttsReady } from '../voice'
 
 const base = import.meta.env.BASE_URL
 const emit = defineEmits<{ close: [] }>()
@@ -72,22 +71,6 @@ const pctText = (v: number) => (v === 0 ? '关' : `${Math.round(v * 100)}%`)
         <label>自带唱片 <small>用自己的音乐试听收音机的音色</small></label>
         <button class="wide" @click="files?.click()">选择本地音频…</button>
         <input ref="files" type="file" accept="audio/*" multiple hidden @change="pick" />
-      </div>
-
-      <div class="field">
-        <label>
-          DJ 语音接口 <small>{{ ttsReady(state.tts) ? '已启用，DJ 的声音会和音乐一起经过收音机' : '可选' }}</small>
-        </label>
-        <p class="hint">
-          浏览器自带的语音合成无法接入 Web Audio，所以 DJ 的声音不会被收音机处理。填入兼容 OpenAI 的
-          <code>/audio/speech</code> 接口后，DJ 的声音就会和音乐一样经过中波 / 电子管滤波。密钥只保存在本机浏览器。
-        </p>
-        <input v-model.trim="state.tts.url" class="text" type="url" placeholder="接口地址，如 https://api.openai.com/v1" autocomplete="off" />
-        <input v-model.trim="state.tts.key" class="text" type="password" placeholder="API Key" autocomplete="off" />
-        <input v-model.trim="state.tts.model" class="text" type="text" placeholder="模型，如 gpt-4o-mini-tts" autocomplete="off" />
-        <div class="voices">
-          <input v-for="h in HOSTS" :key="h.id" v-model.trim="state.tts.voices[h.id]" class="text" type="text" :placeholder="`${h.name}：${h.ttsVoice}`" autocomplete="off" />
-        </div>
       </div>
 
       <details class="diag" @toggle="openDiag">
