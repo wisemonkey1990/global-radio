@@ -42,6 +42,8 @@ export interface AmRadio {
   setMains(hz: 50 | 60): void
   /** 0..1.5 scale for every noise/hum/static source (1 = nominal). */
   setAmbience(amount: number): void
+  /** Cheaper processing for when the screen is off (CPU is throttled and the audio thread starves). */
+  setEco(on: boolean): void
   /** Short tuning sweep: squeal glide + burst of hiss and murmur. */
   tuneSweep(): void
   /** Current simulated fade, 0 (strong signal) … 1 (deep fade). */
@@ -228,19 +230,21 @@ export function createAmRadio(ctx: BaseAudioContext, options: AmRadioOptions = {
   const txLp2 = biquad('lowpass', 5000, qDb(0.707))
   const drive = gain(1.4)
 
+  const shapers: WaveShaperNode[] = []
   const shaper = (curve: Float32Array<ArrayBuffer>) => {
     const s = ctx.createWaveShaper()
     s.curve = curve
-    s.oversample = '4x'
+    s.oversample = '2x'
+    shapers.push(s)
     return s
   }
   const voices: RadioVoice[] = ['mw', 'tube']
   const preSel = { mw: gain(0), tube: gain(0) }
   const preSum = gain(1)
+  const pre = {} as Record<RadioVoice, WaveShaperNode>
   for (const v of voices) {
-    const s = shaper(preampCurve(...PREAMP_SHAPES[v]))
-    drive.connect(s)
-    s.connect(preSel[v])
+    pre[v] = shaper(preampCurve(...PREAMP_SHAPES[v]))
+    pre[v].connect(preSel[v])
     preSel[v].connect(preSum)
   }
   const dc1 = biquad('highpass', 20, qDb(0.707), 0, false)
@@ -281,11 +285,34 @@ export function createAmRadio(ctx: BaseAudioContext, options: AmRadioOptions = {
   const powSel = { mw: gain(0), tube: gain(0) }
   const powSum = gain(1)
   afterAgc.connect(powDrive)
+  const pow = {} as Record<RadioVoice, WaveShaperNode>
   for (const v of voices) {
-    const s = shaper(powerCurve(...POWER_SHAPES[v]))
-    powDrive.connect(s)
-    s.connect(powSel[v])
+    pow[v] = shaper(powerCurve(...POWER_SHAPES[v]))
+    pow[v].connect(powSel[v])
     powSel[v].connect(powSum)
+  }
+
+  // Only the shapers of the active voice (and only the radio branch at all) are wired up: oversampled
+  // waveshapers are the heaviest nodes here, and phones starve the audio thread when the screen is off.
+  const attached = new Set<RadioVoice>()
+  const attach = (v: RadioVoice, on: boolean) => {
+    if (on === attached.has(v)) return
+    if (on) {
+      drive.connect(pre[v])
+      powDrive.connect(pow[v])
+      attached.add(v)
+    } else {
+      drive.disconnect(pre[v])
+      powDrive.disconnect(pow[v])
+      attached.delete(v)
+    }
+  }
+  let wetLinked = false
+  const linkWet = (on: boolean) => {
+    if (on === wetLinked) return
+    if (on) wet.connect(master)
+    else wet.disconnect(master)
+    wetLinked = on
   }
   const dc2 = biquad('highpass', 20, qDb(0.707), 0, false)
 
@@ -301,7 +328,7 @@ export function createAmRadio(ctx: BaseAudioContext, options: AmRadioOptions = {
   combIn.connect(combDelay).connect(combGain).connect(combOut)
   const trim = gain(0.8)
   chain([powSum, dc2, spHp, ...spPeaks, spLp, combIn])
-  combOut.connect(trim).connect(wet).connect(master)
+  combOut.connect(trim).connect(wet)
   master.connect(limiter)
 
   // ---------------------------------------------------------------- air: noise & friends
@@ -361,9 +388,26 @@ export function createAmRadio(ctx: BaseAudioContext, options: AmRadioOptions = {
     glide(humGain.gain, hum * ambience)
   }
 
+  /** After the cross-fade has finished, stop processing whatever is no longer audible. */
+  function pruneLater() {
+    const keep = mode
+    const prune = () => {
+      if (mode !== keep) return
+      if (keep === 'clean') linkWet(false)
+      for (const v of voices) if (v !== keep) attach(v, false)
+    }
+    if (instant) prune()
+    else setTimeout(prune, 150)
+  }
+
   function applyMode() {
     glide(dry.gain, mode === 'clean' ? 1 : 0, 0.02)
     glide(wet.gain, mode === 'clean' ? 0 : 1, 0.02)
+    if (mode !== 'clean') {
+      linkWet(true)
+      attach(mode, true)
+    }
+    pruneLater()
     if (mode === 'clean') {
       applyAmbience()
       return
@@ -468,6 +512,10 @@ export function createAmRadio(ctx: BaseAudioContext, options: AmRadioOptions = {
     },
     tuneSweep,
     fadeNow,
+    setEco(on) {
+      // no oversampling while the page is hidden (screen locked): aliasing on a lo-fi radio is inaudible
+      for (const s of shapers) s.oversample = on ? 'none' : '2x'
+    },
     dispose() {
       for (const s of sources) {
         try {
