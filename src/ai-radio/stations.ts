@@ -20,7 +20,7 @@ export interface Station {
   origin: 'curated' | 'directory'
 }
 
-const SERVERS = ['de1', 'de2', 'all', 'fr1', 'nl1', 'at1', 'us1'].map((h) => `https://${h}.api.radio-browser.info`)
+const SERVERS = ['de1', 'de2', 'all', 'nl1', 'us1'].map((h) => `https://${h}.api.radio-browser.info`)
 const CACHE_TTL_MS = 12 * 3600 * 1000
 const CACHE_KEY = 'ai-radio:dir:v1'
 
@@ -39,6 +39,33 @@ export const CURATED: Record<PresetId, Station[]> = {
   night: [soma('lush', 'Lush'), soma('sonicuniverse', 'Sonic Universe')],
   oldies: [soma('7soul', 'Seven Inch Soul'), soma('illstreet', 'Illinois Street Lounge')],
   sport: [soma('poptron', 'PopTron'), soma('beatblender', 'Beat Blender')],
+}
+
+/**
+ * Mainland-China stations hosted on domestic CDNs (Qingting). They need no VPN, send CORS headers,
+ * and are tried first when the DJ language is Chinese. The same id is available on three hosts.
+ */
+const qt = (id: number, name: string): Station => ({
+  name,
+  urls: [`https://lhttp.qtfm.cn/live/${id}/64k.mp3`, `https://lhttp-hw.qtfm.cn/live/${id}/64k.mp3`, `https://lhttp.qingting.fm/live/${id}/64k.mp3`],
+  country: 'CN',
+  origin: 'curated',
+})
+const direct = (url: string, name: string, country = 'CN'): Station => ({ name, urls: [url], country, origin: 'curated' })
+
+const CURATED_CN: Record<PresetId, Station[]> = {
+  mood: [qt(332, '北京音乐广播'), qt(1271, '深圳音乐广播'), qt(20847, '长沙音乐广播'), qt(4581, 'AsiaFM 亚洲音乐台')],
+  discover: [qt(1671, '济南音乐广播'), qt(15318146, '杭州潮流音乐电台'), qt(4938, '江苏经典流行音乐广播'), qt(1110, '四川音乐广播')],
+  focus: [qt(267, '上海经典音乐广播'), direct('https://radio.chinesemusicworld.com/chinesemusic.mp3', 'Chinese Classical Music')],
+  road: [qt(1260, '广东音乐之声'), qt(1947, '安徽音乐广播'), qt(15318294, '宁夏音乐广播'), qt(1683, '烟台音乐广播')],
+  night: [direct('https://radio.nitro-server.uk/listen/1940sshanghaioldtimesmusicradio/radio.mp3', '上海麗都廣播電台 · 1940s'), qt(267, '上海经典音乐广播')],
+  oldies: [qt(5022308, '500首华语经典'), qt(1296, '湖北经典音乐广播'), qt(1223, '郑州经典音乐广播'), qt(4885, '陕西青少广播 好听1055')],
+  sport: [qt(15318146, '杭州潮流音乐电台'), qt(5022379, '星空电台 STAR RADIO'), direct('https://antares.dribbcast.com/proxy/apop?mp=/s', 'Big B Radio 亚洲音乐台')],
+}
+
+/** Stations known to work without the directory: Chinese ones first for Chinese users, then SomaFM. */
+export function curatedFor(preset: PresetId, lang: Lang): Station[] {
+  return lang === 'zh' ? [...CURATED_CN[preset], ...CURATED[preset]] : [...CURATED[preset], ...CURATED_CN[preset]]
 }
 
 type Query = { tag?: string; language?: string; countrycode?: string }
@@ -75,8 +102,14 @@ interface DirectoryRow {
   lastcheckok: number
 }
 
-let goodServer = 0
+/** Resolves with the first promise that fulfils (Promise.any is ES2021). */
+const firstOk = <T>(ps: Array<Promise<T>>) =>
+  new Promise<T>((resolve, reject) => {
+    let left = ps.length
+    for (const p of ps) p.then(resolve, () => --left === 0 && reject(new Error('all failed')))
+  })
 
+/** The directory mirrors are asked in parallel: whichever answers first wins, so a blocked mirror costs nothing. */
 async function directoryFetch(q: Query): Promise<DirectoryRow[]> {
   const params = new URLSearchParams({
     hidebroken: 'true',
@@ -88,25 +121,24 @@ async function directoryFetch(q: Query): Promise<DirectoryRow[]> {
     ...(q.language ? { language: q.language } : {}),
     ...(q.countrycode ? { countrycode: q.countrycode } : {}),
   })
-  for (let i = 0; i < SERVERS.length; i++) {
-    const server = SERVERS[(goodServer + i) % SERVERS.length]
+  const ask = async (server: string) => {
     const ac = new AbortController()
-    const timer = setTimeout(() => ac.abort(), 6000)
+    const timer = setTimeout(() => ac.abort(), 5000)
     try {
       const res = await fetch(`${server}/json/stations/search?${params}`, { signal: ac.signal })
-      if (!res.ok) continue
-      goodServer = (goodServer + i) % SERVERS.length
+      if (!res.ok) throw new Error(String(res.status))
       return (await res.json()) as DirectoryRow[]
-    } catch {
-      /* try the next mirror */
     } finally {
       clearTimeout(timer)
     }
   }
-  return []
+  try {
+    return await firstOk(SERVERS.map(ask))
+  } catch {
+    return []
+  }
 }
 
-/** Talk, news and religious programming are not what a music preset is for. */
 const NOT_MUSIC = /quran|koran|qur'an|bible|gospel|sermon|church|christian|catholic|islam|prayer|religio|talk|news|podcast|sport|weather|radio ?maria|القرآن|إذاعة|新闻|交通|经济|曲艺|相声|戏曲|评书/i
 
 /** Keep stations a plain <audio> element can stream over https: no HLS, no broken certificates. */

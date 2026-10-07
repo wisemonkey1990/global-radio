@@ -6,7 +6,7 @@ import { createAmRadio, type AmRadio, type RadioMode } from './audio/amRadio'
 import { startGenerative, type Generative } from './audio/generative'
 import { HOSTS, PRESETS, SLEEP_STEPS, type HostId, type Lang, type PresetId } from './data'
 import { cueLine, djLine } from './dj'
-import { CURATED, lastStation, loadDirectory, probeStream, rememberStation, type Station } from './stations'
+import { curatedFor, lastStation, loadDirectory, probeStream, rememberStation, type Station } from './stations'
 import { cancelBrowserSpeech, emptyTts, fetchSpeech, speakWithBrowser, ttsReady, type TtsConfig } from './voice'
 
 const STORE_KEY = 'ai-radio:v1'
@@ -144,13 +144,13 @@ function stopSources() {
   house = null
 }
 
-function startHouse() {
+function startHouse(why = '') {
   if (!ctx) return
   house = startGenerative(ctx, musicGain, state.preset)
   state.source = 'house'
   state.station = ''
   state.tuning = false
-  state.note = '暂时收不到网络电台，先由内置乐队演奏 · 点「换台」重试'
+  state.note = `${why ? why + '，' : ''}先由内置乐队演奏 · 点「换台」重试`
 }
 
 // Stations already tried (played or failed) per preset, so "next station" keeps moving through the pool.
@@ -206,13 +206,19 @@ async function startStream(fresh = true) {
     return [...unique.values()].filter((s) => !tried.has(s.urls[0]))
   }
 
+  const directoryPromise = loadDirectory(preset, state.lang) // fetched while the curated stations are tried
+
   let attempts = 0
+  let reachable = 0
+  let probed = 0
   const run = async (list: Station[]) => {
     for (let i = 0; i < list.length; i += PROBE_BATCH) {
       if (token !== streamToken || attempts >= MAX_ATTEMPTS) return false
       const batch = list.slice(i, i + PROBE_BATCH)
       state.note = `正在连接 ${batch[0].name}…`
       const urls = await Promise.all(batch.map(reachableUrl))
+      probed += batch.length
+      reachable += urls.filter(Boolean).length
       for (let k = 0; k < batch.length; k++) {
         if (token !== streamToken) return false
         const st = batch[k]
@@ -233,15 +239,19 @@ async function startStream(fresh = true) {
     return false
   }
 
-  if (await run(candidates(last ? [last] : [], CURATED[preset]))) return
+  if (await run(candidates(last ? [last] : [], curatedFor(preset, state.lang)))) return
   if (token !== streamToken) return
-  const directory = await loadDirectory(preset, state.lang)
+  const directory = await directoryPromise
   if (token !== streamToken) return
   if (await run(candidates(directory))) return
   if (token !== streamToken) return
   // pool exhausted or unreachable: start over next time, and keep the music going meanwhile
   tried.clear()
-  startHouse()
+  startHouse(
+    directory.length
+      ? `检测了 ${probed} 个电台，${reachable} 个可连接，但都没能开始播放`
+      : `电台目录连不上，精选电台也没有响应（检测了 ${probed} 个）`,
+  )
 }
 
 /** Once a stream is playing: a dropped or stalled connection moves on to another station. */
@@ -368,9 +378,17 @@ function sleepNow() {
 }
 
 // ------------------------------------------------------------------ public API
+/** Safari/iOS only lets an element start playing inside a user gesture; a silent clip played here
+ *  "unlocks" it, so the real stream can be started later, after the async station search. */
+const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA='
+
 export async function play() {
+  if (state.playing) return
   const c = ensureAudio()
-  await c.resume()
+  const resumed = c.resume()
+  audioEl.src = SILENT_WAV
+  audioEl.play().catch(() => undefined)
+  await resumed
   if (state.playing) return
   state.playing = true
   state.tuning = true
@@ -395,6 +413,7 @@ export function pause() {
   if (!state.playing) return
   state.playing = false
   state.tuning = false
+  state.source = ''
   clearInterval(clock)
   sleepEnd = 0
   state.sleepMin = 0
