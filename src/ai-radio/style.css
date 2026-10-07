@@ -438,85 +438,138 @@ input:focus-visible {
   text-overflow: ellipsis;
 }
 
-/* ---------------------------------------------------------------- hosts */
-.hosts {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+/* ---------------------------------------------------------------- tuning knob */
+.tuner {
+  position: relative;
+  width: var(--tw);
+  height: var(--th);
+  margin: -4px auto 0;
 }
 
-.host {
-  display: flex;
-  flex-direction: column;
-  gap: 11px;
-}
-
-.host .key {
-  height: 56px;
-  border-radius: 18px;
-  font-size: 17px;
-  padding-top: 0;
-}
-
-.host .key .led {
+.tuner svg {
   position: absolute;
-  top: 10px;
-  left: 50%;
-  margin-left: -2.5px;
+  inset: 0;
 }
 
-.cue {
+.tk-tick {
+  stroke: var(--text-6);
+  stroke-width: 1.2;
+  stroke-linecap: round;
+}
+
+.tk-tick.major {
+  stroke: var(--text-3);
+  stroke-width: 1.6;
+}
+
+.tk-label {
+  font: 500 11px var(--mono);
+  fill: var(--text-4);
+}
+
+.tk-mark {
+  fill: var(--text-8);
+  transition: fill 0.2s, filter 0.2s;
+}
+
+.tk-mark.on {
+  fill: var(--accent);
+  filter: drop-shadow(0 0 4px rgba(var(--accent-rgb), 0.9));
+}
+
+.tk-lamp {
+  position: absolute;
+  left: 50%;
+  top: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 14px;
-  height: 36px;
-  border-radius: 13px;
-  background: var(--well);
-  box-shadow: inset 2px 3px 6px rgba(var(--sh), 0.6), inset -1px -1px 2px rgba(var(--hi), 0.03);
-  font: 600 12px/1 var(--mono);
+  gap: 6px;
+  transform: translateX(-50%);
+  font: 500 10px/1 var(--mono);
   letter-spacing: 0.22em;
   color: var(--text-8);
-  transition: color 0.2s;
 }
 
-.cue.lit {
-  color: var(--amber-dim);
+.tk-lamp .led {
+  background: var(--led-off);
+  box-shadow: none;
 }
 
-.cue:hover {
-  color: var(--amber);
+.tk-lamp.on {
+  color: var(--text-3);
 }
 
-.vu {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  height: 16px;
+.tk-lamp.on .led {
+  background: var(--accent);
+  box-shadow: 0 0 8px rgba(var(--accent-rgb), 0.95);
 }
 
-.vu i {
-  width: 2.5px;
-  height: 100%;
-  border-radius: 1px;
-  background: currentColor;
-  opacity: 0.35;
-  transform: scaleY(0.45);
+.tk-knob {
+  position: absolute;
+  left: 50%;
+  top: 144px;
+  width: 112px;
+  height: 112px;
+  margin: -56px 0 0 -56px;
+  border-radius: 50%;
+  touch-action: none;
+  cursor: grab;
+  box-shadow: 7px 11px 20px rgba(var(--sh), 0.6), -3px -3px 8px rgba(var(--hi), 0.03);
 }
 
-.cue.speaking {
-  color: var(--amber);
+.tk-knob:active {
+  cursor: grabbing;
 }
 
-.cue.speaking .vu i {
-  opacity: 1;
-  animation: vu 0.7s ease-in-out infinite;
+/* knurled rim: fine alternating ridges, with a soft light on the upper left */
+.tk-rim {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, var(--knob-b) 0deg 3deg, var(--knob-a) 3deg 6deg);
+  transition: transform 0.12s ease-out;
 }
 
-.cue.speaking .vu i:nth-child(2) { animation-delay: -0.15s; }
-.cue.speaking .vu i:nth-child(3) { animation-delay: -0.4s; }
-.cue.speaking .vu i:nth-child(4) { animation-delay: -0.25s; }
-.cue.speaking .vu i:nth-child(5) { animation-delay: -0.5s; }
+.tk-rim::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 24%, rgba(var(--hi), 0.28), transparent 55%), radial-gradient(circle at 70% 80%, rgba(var(--sh), 0.35), transparent 60%);
+  pointer-events: none;
+}
+
+.tk-face {
+  position: absolute;
+  inset: 13px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 28%, var(--knob-a), var(--knob-b) 80%);
+  box-shadow: inset 0 2px 3px rgba(var(--hi), 0.18), inset 0 -3px 6px rgba(var(--sh), 0.55), 0 0 0 2px rgba(var(--sh), 0.5);
+}
+
+.tk-notch {
+  position: absolute;
+  left: 50%;
+  top: 7px;
+  width: 5px;
+  height: 22px;
+  margin-left: -2.5px;
+  border-radius: 2.5px;
+  background: linear-gradient(var(--accent-hi), var(--accent-lo));
+  box-shadow: 0 0 6px rgba(var(--accent-rgb), 0.55);
+}
+
+.tk-dimple {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 65% 70%, rgba(var(--hi), 0.12), rgba(var(--sh), 0.35));
+  box-shadow: inset 2px 3px 5px rgba(var(--sh), 0.55);
+}
 
 /* ---------------------------------------------------------------- quality knob */
 .quality {
@@ -960,16 +1013,6 @@ input:focus-visible {
   }
   92% {
     color: var(--text-2);
-  }
-}
-
-@keyframes vu {
-  0%,
-  100% {
-    transform: scaleY(0.3);
-  }
-  50% {
-    transform: scaleY(1);
   }
 }
 

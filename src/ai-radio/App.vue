@@ -3,16 +3,17 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import ModeKnob from './components/ModeKnob.vue'
 import SettingsSheet from './components/SettingsSheet.vue'
 import SleepFader from './components/SleepFader.vue'
-import { HOSTS, LANGS, MODES, PRESETS, dialText } from './data'
-import { cue, nextStation, setHost, setLang, setMode, setSleep, state, togglePlay, tune } from './engine'
+import TuningKnob from './components/TuningKnob.vue'
+import { HOSTS, HOST_FOR, LANGS, MODES, PRESETS, dialText } from './data'
+import { nextStation, setFrequency, setLang, setMode, setSleep, state, togglePlay, tune } from './engine'
 
 const showSettings = ref(false)
 const showLang = ref(false)
 
 const current = computed(() => PRESETS.find((p) => p.id === state.preset) ?? PRESETS[0])
-const currentHost = computed(() => HOSTS.find((h) => h.id === state.host) ?? HOSTS[0])
+const currentHost = computed(() => HOSTS.find((h) => h.id === HOST_FOR[state.preset]) ?? HOSTS[0])
 const currentMode = computed(() => MODES.find((m) => m.id === state.mode) ?? MODES[1])
-const dial = computed(() => dialText(current.value, state.mode))
+const dial = computed(() => dialText(state.freq, state.mode))
 const langLabel = computed(() => LANGS.find((l) => l.id === state.lang)?.label ?? '')
 
 const mmss = (s: number) => {
@@ -27,6 +28,7 @@ const status = computed(() => {
   if (state.alert) return state.alert
   if (!state.playing) return '点一个频道开始收听，再点一下停止'
   if (state.tuning) return '调谐中…'
+  if (state.source === 'static') return state.note
   if (state.djSpeaking) return `${currentHost.value.name} 正在播报`
   return state.note
 })
@@ -88,7 +90,12 @@ onBeforeUnmount(() => {
     </section>
 
     <p class="now">
-      <b>{{ current.name }}</b><span>{{ current.tagline }}</span>
+      <template v-if="state.locked">
+        <b>{{ current.name }}</b><span>{{ current.tagline }}</span>
+      </template>
+      <template v-else>
+        <b>无信号</b><span>电台之间，只有电波的沙沙声</span>
+      </template>
     </p>
     <p class="status" :class="{ busy: state.tuning }">{{ status }}</p>
 
@@ -102,24 +109,14 @@ onBeforeUnmount(() => {
         </span>
       </div>
       <div class="presets">
-        <button v-for="p in PRESETS" :key="p.id" class="key preset" :class="{ active: p.id === state.preset }" @click="tune(p.id)">
-          <small><i v-if="p.id === state.preset && state.playing" class="led" />{{ dialText(p, state.mode).value }}</small>
+        <button v-for="p in PRESETS" :key="p.id" class="key preset" :class="{ active: state.locked && p.id === state.preset }" @click="tune(p.id)">
+          <small><i v-if="state.locked && p.id === state.preset && state.playing" class="led" />{{ dialText(p.freq, state.mode).value }}</small>
           <span>{{ p.name }}</span>
         </button>
       </div>
 
-      <h2 class="sec">主持<small>{{ currentHost.desc }}</small></h2>
-      <div class="hosts">
-        <div v-for="h in HOSTS" :key="h.id" class="host">
-          <button class="key" :class="{ active: h.id === state.host }" @click="setHost(h.id)">
-            <i v-if="h.id === state.host" class="led" />{{ h.name }}
-          </button>
-          <button class="cue" :class="{ lit: h.id === state.host, speaking: state.cueHost === h.id }" :aria-label="`试听 ${h.name} 的声音`" @click="cue(h.id)">
-            <span>CUE</span>
-            <span class="vu"><i /><i /><i /><i /><i /></span>
-          </button>
-        </div>
-      </div>
+      <h2 class="sec">调台<small>转动旋钮选台，对准频道自动锁定</small></h2>
+      <TuningKnob :model-value="state.freq" :locked="state.locked" :playing="state.playing" :mode="state.mode" @update:model-value="setFrequency" />
 
       <h2 class="sec">音质<small>给整台电台的声音上色</small></h2>
       <div class="quality">

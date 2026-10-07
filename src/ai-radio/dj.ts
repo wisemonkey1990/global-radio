@@ -26,7 +26,6 @@ const ZH = {
   } as Record<PresetId, string[]>,
   sign: { randy: '我是 Randy，慢慢来。', kevin: '我是 Kevin，继续往下听。', iris: '我是 Iris，待会儿见。' },
   station: (p: Preset) => `这里是调频 ${p.freq.toFixed(1)}，${p.name}电台。`,
-  cue: (h: Host) => `嗨，我是 ${h.name}。这是我的声音，喜欢的话，就让我陪你听一会儿。`,
 }
 
 const EN = {
@@ -50,7 +49,6 @@ const EN = {
   } as Record<PresetId, string[]>,
   sign: { randy: 'I’m Randy. Take it slow.', kevin: 'I’m Kevin. Stay tuned.', iris: 'I’m Iris. See you in a bit.' },
   station: (p: Preset) => `This is FM ${p.freq.toFixed(1)}, ${EN_NAMES[p.id]} radio.`,
-  cue: (h: Host) => `Hi, I’m ${h.name}. This is my voice. If you like it, let me keep you company for a while.`,
 }
 
 const EN_NAMES: Record<PresetId, string> = {
@@ -73,6 +71,3 @@ export function djLine(lang: Lang, preset: Preset, host: Host, now = new Date())
   return [pick(t.greet[dp]) + glue + t.station(preset), pick(t.vibe[preset.id]), t.sign[host.id]].join(' ')
 }
 
-export function cueLine(lang: Lang, host: Host): string {
-  return (lang === 'zh' ? ZH : EN).cue(host)
-}
