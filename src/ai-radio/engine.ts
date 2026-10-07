@@ -151,6 +151,21 @@ function createKeepAlive() {
   return el
 }
 
+/**
+ * Page lifecycle and network events, logged for the diagnostics. With the screen locked, Android may
+ * freeze the page or cut the network; seeing which of these happened (and when) tells us what to fix.
+ */
+function watchLifecycle() {
+  document.addEventListener('freeze', () => log('页面被系统冻结 (freeze)'))
+  document.addEventListener('resume', () => log('页面解冻 (resume)'))
+  window.addEventListener('pagehide', () => log('pagehide'))
+  window.addEventListener('pageshow', () => log('pageshow'))
+  window.addEventListener('online', () => log('网络恢复 (online)'))
+  window.addEventListener('offline', () => log('网络断开 (offline)'))
+  const conn = (navigator as unknown as { connection?: EventTarget & { effectiveType?: string; type?: string } }).connection
+  conn?.addEventListener('change', () => log(`网络类型变化 ${conn.type ?? ''} ${conn.effectiveType ?? ''}`))
+}
+
 function ensureAudio() {
   if (ctx) return ctx
   const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
@@ -192,13 +207,14 @@ function ensureAudio() {
     if (state.source === 'local') nextLocal()
   })
   document.addEventListener('visibilitychange', onVisibility)
+  watchLifecycle()
   return ctx
 }
 
 function log(message: string) {
   const t = new Date().toTimeString().slice(0, 8)
   state.log.push(`${t} ${document.hidden ? '[后台] ' : ''}${message}`)
-  if (state.log.length > 80) state.log.splice(0, state.log.length - 80)
+  if (state.log.length > 120) state.log.splice(0, state.log.length - 120)
 }
 
 let alertTimer = 0
@@ -369,7 +385,13 @@ let heartbeat = 0
 let deadTicks = 0
 let lastTime = -1
 
+let lastBeat = 0
+
 function beat() {
+  const now = Date.now()
+  // a long gap between beats means timers were throttled or the page was frozen (screen locked)
+  if (lastBeat && now - lastBeat > HEARTBEAT_MS * 2.5) log(`心跳间隔 ${Math.round((now - lastBeat) / 1000)} 秒：页面被限速或冻结`)
+  lastBeat = now
   if (!state.playing || !ctx || state.tuning) return
   if (ctx.state !== 'running') void ctx.resume()
   if (keepAlive.paused) keepAlive.play().catch(() => undefined)
@@ -571,6 +593,7 @@ export async function play() {
   clock = window.setInterval(tickClock, 250)
   clearInterval(heartbeat)
   deadTicks = 0
+  lastBeat = 0
   heartbeat = window.setInterval(beat, HEARTBEAT_MS)
   musicGain.gain.cancelScheduledValues(c.currentTime)
   musicGain.gain.setValueAtTime(1, c.currentTime)
@@ -746,6 +769,7 @@ export function diagnostics(): string {
     `安全上下文: ${window.isSecureContext}  可见性: ${document.visibilityState}`,
     `AudioContext: ${ctx ? `${ctx.state} ${ctx.sampleRate}Hz` : '未创建'}  audioSession: ${nav.audioSession ? nav.audioSession.type : '不支持'}`,
     `mediaSession: ${'mediaSession' in navigator}  语音合成: ${synth ? `${synth.length} 个声音 (${[...new Set(synth.map((v) => v.lang))].slice(0, 6).join(', ')})` : '不支持'}`,
+    `网络: ${navigator.onLine ? 'online' : 'offline'} ${(navigator as unknown as { connection?: { type?: string; effectiveType?: string } }).connection?.type ?? ''} ${(navigator as unknown as { connection?: { effectiveType?: string } }).connection?.effectiveType ?? ''}`,
     `来源: ${state.source || '-'}  电台: ${state.station || '-'}  播放中: ${state.playing}`,
     '--- 最近事件 ---',
     ...state.log,
