@@ -2,7 +2,7 @@
 // sources, sleep timer, and the reactive state the UI renders.
 
 import { reactive, watch } from 'vue'
-import { createAmRadio, type AmRadio, type RadioMode } from './audio/amRadio'
+import { DEFAULT_FX, createAmRadio, type AmRadio, type RadioFx, type RadioMode } from './audio/amRadio'
 import { startGenerative, type Generative } from './audio/generative'
 import { FREQ_MAX, FREQ_MIN, LOCK_WINDOW, PRESETS, SLEEP_STEPS, THEMES, type Lang, type PresetId, type Theme } from './data'
 import { curatedFor, lastStation, loadDirectory, probeStream, rememberStation, type Station } from './stations'
@@ -20,7 +20,7 @@ interface Saved {
   mode: RadioMode
   lang: Lang
   mains: 50 | 60
-  ambience: number
+  fx: RadioFx
   theme: Theme
 }
 
@@ -50,8 +50,8 @@ export const state = reactive({
   mode: (['clean', 'mw', 'tube'].includes(saved.mode as string) ? saved.mode : 'mw') as RadioMode,
   lang: (saved.lang === 'en' ? 'en' : 'zh') as Lang,
   mains: (saved.mains === 60 ? 60 : 50) as 50 | 60,
-  /** 0..1.5, scales hiss / static / hum / interference */
-  ambience: typeof saved.ambience === 'number' ? saved.ambience : 1,
+  /** adjustable character of the radio, see RadioFx */
+  fx: { ...DEFAULT_FX, ...saved.fx } as RadioFx,
   theme: (THEMES.some((t) => t.id === saved.theme) ? saved.theme : 'dark') as Theme,
 
   playing: false,
@@ -81,7 +81,7 @@ export const state = reactive({
 }
 
 watch(
-  () => [state.preset, state.freq, state.mode, state.lang, state.mains, state.ambience, state.theme],
+  () => [state.preset, state.freq, state.mode, state.lang, state.mains, state.fx, state.theme],
   () => {
     const out: Saved = {
       preset: state.preset,
@@ -89,7 +89,7 @@ watch(
       mode: state.mode,
       lang: state.lang,
       mains: state.mains,
-      ambience: state.ambience,
+      fx: state.fx,
       theme: state.theme,
     }
     try {
@@ -182,8 +182,7 @@ function ensureAudio() {
   // locked and ignores the silent switch (the default session type "auto" lets the system stop Web Audio)
   const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession
   if (session) session.type = 'playback'
-  radio = createAmRadio(ctx, { mode: state.mode, mainsHz: state.mains })
-  radio.setAmbience(state.ambience)
+  radio = createAmRadio(ctx, { mode: state.mode, mainsHz: state.mains, fx: { ...state.fx } })
   radio.setEco(document.hidden)
 
   musicGain = ctx.createGain()
@@ -642,9 +641,14 @@ export function setMains(hz: 50 | 60) {
   radio?.setMains(hz)
 }
 
-export function setAmbience(amount: number) {
-  state.ambience = amount
-  radio?.setAmbience(amount)
+export function setFx(key: keyof RadioFx, value: number) {
+  state.fx[key] = value
+  radio?.setFx({ [key]: value })
+}
+
+export function resetFx() {
+  state.fx = { ...DEFAULT_FX }
+  radio?.setFx({ ...DEFAULT_FX })
 }
 
 export async function playLocalFiles(files: File[]) {
